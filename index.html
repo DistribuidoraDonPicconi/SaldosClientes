@@ -15,6 +15,9 @@
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 
+<!-- Genera imágenes (para el botón "Compartir" de la pestaña Clientes) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
 <style>
   :root{
     --azul-osc: #16305c;
@@ -876,68 +879,97 @@ btnOcultarCero.addEventListener('click', () => {
   render();
 });
 
-// Arma un texto prolijo con la lista de clientes actualmente visible
-// (respeta el buscador y el filtro de "ocultar en $0") y lo comparte:
-// usa el share nativo del celular si está disponible (para mandarlo
-// directo por WhatsApp, por ejemplo) y si no, lo copia al portapapeles.
-function armarTextoSaldos(){
-  const fecha = new Date().toLocaleDateString('es-AR');
-  const lineas = ultimaListaClientesVisible.map(c => `${c.nombre}: ${formatMoneda(c.saldo)}`);
-  const total = ultimaListaClientesVisible.reduce((acc, c) => acc + c.saldo, 0);
-  return [
-    'Saldos de clientes - Distribuidora Don Picconi',
-    `Fecha: ${fecha}`,
-    '',
-    ...(lineas.length ? lineas : ['(sin clientes que coincidan)']),
-    '',
-    `Total: ${formatMoneda(total)}`
-  ].join('\n');
+/* ============== Pestaña Clientes: generar y compartir imagen ============== */
+
+// Nombre de archivo con fecha, sin caracteres raros.
+function fechaParaArchivo(){
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function marcarCompartirOk(){
+  const original = btnCompartir.innerHTML;
+  btnCompartir.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  setTimeout(() => { btnCompartir.innerHTML = original; }, 1400);
+}
+
+// Arma una versión "prolija" de la tabla de Clientes (con título y
+// fecha arriba) fuera de pantalla, y la convierte en imagen con
+// html2canvas. Usa la tabla que se está viendo en ese momento (respeta
+// el buscador y el filtro de "ocultar en $0"), así la imagen coincide
+// con lo que aparece en pantalla.
+async function generarImagenClientes(){
+  if(!window.html2canvas){
+    throw new Error('No se pudo cargar la librería para generar imágenes. Revisá tu conexión a internet.');
+  }
+  const wrap = mainEl.querySelector('.stock-table-wrap');
+  if(!wrap) throw new Error('No hay tabla de clientes para capturar.');
+
+  const contenedor = document.createElement('div');
+  contenedor.style.cssText = 'position:fixed; left:-9999px; top:0; width:480px; background:#ffffff; padding:22px; font-family:' + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';';
+  contenedor.innerHTML = `
+    <div style="font-size:21px;font-weight:800;color:#111624;letter-spacing:-0.4px;margin-bottom:2px;">Clientes</div>
+    <div style="font-size:14px;font-weight:700;color:#2a5cc9;margin-bottom:16px;">Distribuidora Don Picconi — ${new Date().toLocaleDateString('es-AR')}</div>
+  `;
+  contenedor.appendChild(wrap.cloneNode(true));
+  document.body.appendChild(contenedor);
+
+  try{
+    const canvas = await html2canvas(contenedor, { backgroundColor: '#ffffff', scale: 2 });
+    return canvas;
+  }finally{
+    document.body.removeChild(contenedor);
+  }
 }
 
 btnCompartir.addEventListener('click', async () => {
-  const texto = armarTextoSaldos();
-
-  if(navigator.share){
-    try{
-      await navigator.share({ text: texto, title: 'Saldos de clientes' });
-      return;
-    }catch(err){
-      if(err && err.name === 'AbortError') return; // el usuario canceló
-      // si falla el share nativo, seguimos abajo con el portapapeles
-    }
-  }
-
-  const marcarCopiado = () => {
-    const original = btnCompartir.innerHTML;
-    btnCompartir.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-    setTimeout(() => { btnCompartir.innerHTML = original; }, 1400);
-  };
-
-  // navigator.clipboard requiere contexto seguro (https/localhost); si
-  // la app se abre como archivo local (file://) no está disponible, así
-  // que hay un método de respaldo con un textarea + execCommand.
-  if(navigator.clipboard && window.isSecureContext){
-    try{
-      await navigator.clipboard.writeText(texto);
-      marcarCopiado();
-      return;
-    }catch(err){ /* seguimos con el respaldo */ }
-  }
-
+  btnCompartir.disabled = true;
+  btnCompartir.classList.add('spinning');
   try{
-    const textarea = document.createElement('textarea');
-    textarea.value = texto;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    if(!ok) throw new Error('execCommand falló');
-    marcarCopiado();
+    const canvas = await generarImagenClientes();
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if(!blob) throw new Error('No se pudo generar la imagen.');
+
+    const nombreArchivo = `saldos-clientes-${fechaParaArchivo()}.png`;
+    const archivo = new File([blob], nombreArchivo, { type: 'image/png' });
+
+    // 1) Compartir nativo con imagen adjunta (celular: WhatsApp, etc.)
+    if(navigator.canShare && navigator.canShare({ files: [archivo] })){
+      try{
+        await navigator.share({ files: [archivo], title: 'Saldos de clientes' });
+        return;
+      }catch(err){
+        if(err && err.name === 'AbortError') return; // el usuario canceló
+      }
+    }
+
+    // 2) Copiar la imagen al portapapeles (requiere contexto seguro)
+    if(navigator.clipboard && window.isSecureContext && window.ClipboardItem){
+      try{
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        marcarCompartirOk();
+        return;
+      }catch(err){ /* seguimos con la descarga */ }
+    }
+
+    // 3) Respaldo: descargar el PNG para compartirlo a mano
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    marcarCompartirOk();
   }catch(err){
-    alert('No se pudo copiar automáticamente. Este es el texto para copiar a mano:\n\n' + texto);
+    alert('No se pudo generar la imagen: ' + err.message);
+  }finally{
+    btnCompartir.disabled = false;
+    btnCompartir.classList.remove('spinning');
   }
 });
 
