@@ -144,30 +144,13 @@
   table.clientes tr.cliente-row.selected td{ background:var(--azul-suave); }
   table.clientes tr.cliente-row.selected td.nombre{ color:var(--azul-osc); }
 
-  /* Tabla Resumen (saldo por categoría de reparto) */
-  table.resumen{ border-collapse:collapse; width:100%; }
-  table.resumen td{
-    padding:12px; border-bottom:1px solid var(--linea); border-right:1px solid var(--linea);
-    vertical-align:middle; text-align:center;
-  }
-  table.resumen td:last-child{ border-right:none; }
-  table.resumen tr:last-child td{ border-bottom:none; }
-  table.resumen tr:nth-child(even){ background:#fafbfd; }
-  table.resumen td.categoria{ font-size:15.5px; font-weight:700; color:#1a1f2b; }
-  table.resumen td.saldo{ font-size:16px; font-weight:800; color:#1a1f2b; }
-  table.resumen td.saldo.pos{ color:var(--rojo); }
-  table.resumen td.saldo.zero{ color:#9aa5ba; font-weight:600; }
-  table.resumen th{
-    text-align:center; font-size:12.5px; font-weight:800; color:var(--texto-tenue);
-    text-transform:uppercase; letter-spacing:0.3px;
-    padding:9px 12px; border-bottom:1.5px solid var(--linea); border-right:1px solid var(--linea);
-    background:#fafbfd;
-  }
-  table.resumen th:last-child{ border-right:none; }
-  table.resumen tr.total-row td{ background:#eef3fc; border-top:1.5px solid var(--azul-borde); }
-  table.resumen tr.total-row td.categoria{ color:var(--azul-osc); font-weight:800; }
-  table.resumen tr.total-row td.saldo{ font-size:16.5px; color:var(--azul-osc); }
-  table.resumen tr.total-row td.saldo.pos{ color:var(--rojo); }
+  /* Filas de desglose por categoría de reparto, debajo del Total */
+  table.clientes tr.categoria-row td{ background:#f7f9fd; border-top:1px solid var(--linea); }
+  table.clientes tr.categoria-row td.nombre{ font-size:13px; font-weight:700; color:var(--texto-tenue); text-transform:uppercase; letter-spacing:0.2px; }
+  table.clientes tr.categoria-row td.saldo{ font-size:14.5px; font-weight:700; color:#1a1f2b; }
+  table.clientes tr.categoria-row td.saldo.pos{ color:var(--rojo); }
+  table.clientes tr.categoria-row td.saldo.zero{ color:#9aa5ba; font-weight:600; }
+
 
   /* Tabla Movimientos */
   .mov-table-wrap{
@@ -232,6 +215,38 @@
   .confirm-box .btn-cancelar:active{ background:var(--azul-borde); }
   .confirm-box .btn-confirmar{ background:var(--rojo); color:#fff; }
   .confirm-box .btn-confirmar:active{ opacity:0.85; }
+
+  /* Modal: elegir cómo compartir la imagen generada */
+  #compartir-modal{
+    position:fixed; inset:0; z-index:200;
+    background:rgba(17,22,36,0.55);
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  #compartir-modal.hidden{ display:none; }
+  .compartir-box{
+    width:100%; max-width:340px;
+    background:#fff; border-radius:18px;
+    padding:20px 20px 20px;
+    text-align:center;
+    box-shadow:0 12px 30px rgba(17,22,36,0.25);
+  }
+  .compartir-box h3{ font-size:17px; margin:0 0 12px; color:#111624; font-weight:800; }
+  .compartir-preview{
+    width:100%; max-height:280px; overflow:hidden auto;
+    border:1px solid var(--linea); border-radius:12px;
+    margin-bottom:16px; background:#f7f9fd;
+  }
+  .compartir-preview img{ width:100%; display:block; }
+  .compartir-box .compartir-actions{ display:flex; flex-direction:column; gap:10px; }
+  .compartir-box button{ padding:13px; border-radius:12px; border:none; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .compartir-box button svg{ width:19px; height:19px; }
+  .compartir-box .btn-descargar{ background:var(--azul); color:#fff; }
+  .compartir-box .btn-descargar:active{ opacity:0.85; }
+  .compartir-box .btn-whatsapp{ background:#25d366; color:#fff; }
+  .compartir-box .btn-whatsapp:active{ opacity:0.85; }
+  .compartir-box .btn-cerrar-compartir{ background:var(--azul-suave); color:var(--azul-osc); margin-top:2px; }
+  .compartir-box .btn-cerrar-compartir:active{ background:var(--azul-borde); }
 
   /* Botón flotante (+) para nuevo movimiento */
   .fab{
@@ -362,6 +377,26 @@
   </div>
 </div>
 
+<div id="compartir-modal" class="hidden">
+  <div class="compartir-box">
+    <h3>Imagen de saldos</h3>
+    <div class="compartir-preview">
+      <img id="compartir-preview-img" alt="Vista previa de la imagen generada">
+    </div>
+    <div class="compartir-actions">
+      <button class="btn-descargar" id="btn-compartir-descargar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar imagen
+      </button>
+      <button class="btn-whatsapp" id="btn-compartir-whatsapp">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.868-2.03-.967-.273-.099-.472-.148-.67.15-.198.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.99.583 3.845 1.588 5.405L2 22l4.735-1.552A9.947 9.947 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.222a8.19 8.19 0 0 1-4.19-1.148l-.3-.179-3.12 1.023 1.04-3.03-.196-.312A8.185 8.185 0 0 1 3.778 12c0-4.535 3.687-8.222 8.222-8.222S20.222 7.465 20.222 12 16.535 20.222 12 20.222z"/></svg>
+        Compartir por WhatsApp
+      </button>
+      <button class="btn-cerrar-compartir" id="btn-compartir-cerrar">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div id="fab-acciones" class="fab-acciones hidden">
   <button id="fab-copiar" class="fab-accion copiar" aria-label="Copiar movimiento">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -484,7 +519,6 @@
   <div class="pill-tabs">
     <button id="tab-clientes" data-tab="clientes" class="active">Clientes</button>
     <button id="tab-mov" data-tab="movimientos">Movimientos</button>
-    <button id="tab-resumen" data-tab="resumen">Resumen</button>
   </div>
 
   <div class="search-wrap" id="search-wrap">
@@ -629,6 +663,34 @@ function renderClientes(filtro){
     <td class="saldo ${claseTotal}">${formatMoneda(totalGeneral)}</td>
   </tr>`;
 
+  // Desglose por categoría de reparto, debajo del Total. Se calcula
+  // sobre la misma lista que ya está filtrada/visible arriba, así el
+  // desglose siempre coincide con lo que se está mostrando.
+  const porCategoria = {};
+  CONFIG.REPARTOS.forEach(r => { porCategoria[r] = 0; });
+  clientes.forEach(c => {
+    const categoria = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
+    porCategoria[categoria] = (porCategoria[categoria] || 0) + c.saldo;
+  });
+  const categorias = Object.keys(porCategoria)
+    .filter(cat => CONFIG.REPARTOS.includes(cat) || porCategoria[cat] !== 0)
+    .sort((a, b) => {
+      const ia = CONFIG.REPARTOS.indexOf(a);
+      const ib = CONFIG.REPARTOS.indexOf(b);
+      if(ia === -1) return 1;
+      if(ib === -1) return -1;
+      return ia - ib;
+    });
+  const filasCategoria = categorias.map(cat => {
+    const saldo = porCategoria[cat];
+    const saldoRedondeado = Math.round((saldo + Number.EPSILON) * 100) / 100;
+    const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
+    return `<tr class="categoria-row">
+      <td class="nombre" colspan="3">${cat}</td>
+      <td class="saldo ${cls}">${formatMoneda(saldo)}</td>
+    </tr>`;
+  }).join('');
+
   mainEl.innerHTML = `
     <div class="stock-table-wrap">
       <table class="clientes">
@@ -640,7 +702,7 @@ function renderClientes(filtro){
             <th>Saldo</th>
           </tr>
         </thead>
-        <tbody>${filas}${filaTotal}</tbody>
+        <tbody>${filas}${filaTotal}${filasCategoria}</tbody>
       </table>
     </div>`;
 
@@ -652,58 +714,6 @@ function renderClientes(filtro){
     });
   });
   actualizarSeleccionUI();
-}
-
-/* ============== Pestaña Resumen (saldo por categoría de reparto) ============== */
-function renderResumen(){
-  const porCategoria = {};
-  CONFIG.REPARTOS.forEach(r => { porCategoria[r] = 0; });
-
-  let totalGeneral = 0;
-  calcularSaldosClientes().forEach(c => {
-    const categoria = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
-    porCategoria[categoria] = (porCategoria[categoria] || 0) + c.saldo;
-    totalGeneral += c.saldo;
-  });
-
-  const categorias = Object.keys(porCategoria)
-    .filter(cat => CONFIG.REPARTOS.includes(cat) || porCategoria[cat] !== 0)
-    .sort((a, b) => {
-      const ia = CONFIG.REPARTOS.indexOf(a);
-      const ib = CONFIG.REPARTOS.indexOf(b);
-      if(ia === -1) return 1;
-      if(ib === -1) return -1;
-      return ia - ib;
-    });
-
-  const filas = categorias.map(cat => {
-    const saldo = porCategoria[cat];
-    const saldoRedondeado = Math.round((saldo + Number.EPSILON) * 100) / 100;
-    const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
-    return `<tr>
-      <td class="categoria">${cat}</td>
-      <td class="saldo ${cls}">${formatMoneda(saldo)}</td>
-    </tr>`;
-  }).join('');
-
-  const claseTotal = totalGeneral > 0 ? 'pos' : (totalGeneral < 0 ? 'neg' : 'zero');
-  const filaTotal = `<tr class="total-row">
-    <td class="categoria">Totales</td>
-    <td class="saldo ${claseTotal}">${formatMoneda(totalGeneral)}</td>
-  </tr>`;
-
-  mainEl.innerHTML = `
-    <div class="stock-table-wrap">
-      <table class="resumen">
-        <thead>
-          <tr>
-            <th>Tipo de Reparto</th>
-            <th>Saldo Acumulado</th>
-          </tr>
-        </thead>
-        <tbody>${filas}${filaTotal}</tbody>
-      </table>
-    </div>`;
 }
 
 /* ============== Pestaña Movimientos ============== */
@@ -780,7 +790,7 @@ function actualizarListaClientes(){
 }
 
 /* ============== Scroll / tabs ============== */
-const scrollState = { clientes: 0, movimientos: { top: 0, left: 0 }, resumen: 0 };
+const scrollState = { clientes: 0, movimientos: { top: 0, left: 0 } };
 let irAlFondoMovimientos = false;
 
 function guardarScrollActual(){
@@ -790,8 +800,6 @@ function guardarScrollActual(){
       scrollState.movimientos.top = movScroll.scrollTop;
       scrollState.movimientos.left = movScroll.scrollLeft;
     }
-  }else if(currentTab === 'resumen'){
-    scrollState.resumen = mainEl.scrollTop;
   }else{
     scrollState.clientes = mainEl.scrollTop;
   }
@@ -810,8 +818,6 @@ function restaurarScroll(){
         movScroll.scrollLeft = scrollState.movimientos.left;
       }
     }
-  }else if(currentTab === 'resumen'){
-    mainEl.scrollTop = scrollState.resumen;
   }else{
     mainEl.scrollTop = scrollState.clientes;
   }
@@ -820,21 +826,17 @@ function restaurarScroll(){
 function render(){
   const filtro = searchEl.value.trim();
   mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
-  searchWrapEl.classList.toggle('hidden', currentTab === 'resumen');
-  fabNuevo.classList.toggle('hidden', currentTab === 'resumen');
+  fabNuevo.classList.remove('hidden');
   btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
   btnCompartir.classList.toggle('hidden', currentTab !== 'clientes');
   if(currentTab === 'clientes'){
     headerTitle.textContent = 'Clientes';
     searchEl.placeholder = 'Buscar cliente...';
     renderClientes(filtro);
-  }else if(currentTab === 'movimientos'){
+  }else{
     headerTitle.textContent = 'Movimientos';
     searchEl.placeholder = 'Buscar movimiento...';
     renderMovimientos(filtro);
-  }else{
-    headerTitle.textContent = 'Resumen';
-    renderResumen();
   }
   restaurarScroll();
   posicionarFabs();
@@ -854,14 +856,12 @@ function setTab(tab){
   currentTab = tab;
   document.getElementById('tab-clientes').classList.toggle('active', tab === 'clientes');
   document.getElementById('tab-mov').classList.toggle('active', tab === 'movimientos');
-  document.getElementById('tab-resumen').classList.toggle('active', tab === 'resumen');
   deseleccionarFila();
   render();
 }
 
 document.getElementById('tab-clientes').addEventListener('click', () => setTab('clientes'));
 document.getElementById('tab-mov').addEventListener('click', () => setTab('movimientos'));
-document.getElementById('tab-resumen').addEventListener('click', () => setTab('resumen'));
 
 btnRefresh.addEventListener('click', cargarDatos);
 searchEl.addEventListener('input', () => {
@@ -925,6 +925,59 @@ async function generarImagenClientes(){
   }
 }
 
+// Modal para elegir cómo compartir la imagen ya generada.
+const compartirModal = document.getElementById('compartir-modal');
+const compartirPreviewImg = document.getElementById('compartir-preview-img');
+const btnCompartirDescargar = document.getElementById('btn-compartir-descargar');
+const btnCompartirWhatsapp = document.getElementById('btn-compartir-whatsapp');
+const btnCompartirCerrar = document.getElementById('btn-compartir-cerrar');
+let compartirBlobActual = null;
+let compartirUrlActual = null;
+let compartirNombreActual = null;
+
+function cerrarCompartirModal(){
+  compartirModal.classList.add('hidden');
+  if(compartirUrlActual){ URL.revokeObjectURL(compartirUrlActual); }
+  compartirBlobActual = null;
+  compartirUrlActual = null;
+  compartirNombreActual = null;
+}
+
+btnCompartirCerrar.addEventListener('click', cerrarCompartirModal);
+
+btnCompartirDescargar.addEventListener('click', () => {
+  if(!compartirBlobActual || !compartirUrlActual) return;
+  const a = document.createElement('a');
+  a.href = compartirUrlActual;
+  a.download = compartirNombreActual;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  marcarCompartirOk();
+  cerrarCompartirModal();
+});
+
+btnCompartirWhatsapp.addEventListener('click', async () => {
+  if(!compartirBlobActual) return;
+  const archivo = new File([compartirBlobActual], compartirNombreActual, { type: 'image/png' });
+
+  // Compartir nativo con imagen adjunta (celular: abre WhatsApp entre las opciones).
+  if(navigator.canShare && navigator.canShare({ files: [archivo] })){
+    try{
+      await navigator.share({ files: [archivo], title: 'Saldos de clientes' });
+      marcarCompartirOk();
+      cerrarCompartirModal();
+      return;
+    }catch(err){
+      if(err && err.name === 'AbortError') return; // el usuario canceló, dejamos el modal abierto
+    }
+  }
+
+  // En PC no existe forma de adjuntar la imagen directo a WhatsApp Web/Desktop
+  // desde el navegador: avisamos y dejamos la descarga como alternativa.
+  alert('En la computadora no se puede enviar la imagen directo a WhatsApp. Tocá "Descargar imagen" y después adjuntala manualmente en WhatsApp Web o Desktop.');
+});
+
 btnCompartir.addEventListener('click', async () => {
   btnCompartir.disabled = true;
   btnCompartir.classList.add('spinning');
@@ -933,38 +986,11 @@ btnCompartir.addEventListener('click', async () => {
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     if(!blob) throw new Error('No se pudo generar la imagen.');
 
-    const nombreArchivo = `saldos-clientes-${fechaParaArchivo()}.png`;
-    const archivo = new File([blob], nombreArchivo, { type: 'image/png' });
-
-    // 1) Compartir nativo con imagen adjunta (celular: WhatsApp, etc.)
-    if(navigator.canShare && navigator.canShare({ files: [archivo] })){
-      try{
-        await navigator.share({ files: [archivo], title: 'Saldos de clientes' });
-        return;
-      }catch(err){
-        if(err && err.name === 'AbortError') return; // el usuario canceló
-      }
-    }
-
-    // 2) Copiar la imagen al portapapeles (requiere contexto seguro)
-    if(navigator.clipboard && window.isSecureContext && window.ClipboardItem){
-      try{
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        marcarCompartirOk();
-        return;
-      }catch(err){ /* seguimos con la descarga */ }
-    }
-
-    // 3) Respaldo: descargar el PNG para compartirlo a mano
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nombreArchivo;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    marcarCompartirOk();
+    compartirBlobActual = blob;
+    compartirNombreActual = `saldos-clientes-${fechaParaArchivo()}.png`;
+    compartirUrlActual = URL.createObjectURL(blob);
+    compartirPreviewImg.src = compartirUrlActual;
+    compartirModal.classList.remove('hidden');
   }catch(err){
     alert('No se pudo generar la imagen: ' + err.message);
   }finally{
