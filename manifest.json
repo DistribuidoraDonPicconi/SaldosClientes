@@ -1,0 +1,15 @@
+{
+  "name": "Clientes DP",
+  "short_name": "Clientes DP",
+  "description": "Cuenta corriente de clientes - Distribuidora Don Picconi",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f7fc",
+  "theme_color": "#16305c",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Clientes</title>
+
+<!-- PWA: instalable en el celular -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16305c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Clientes DP">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+
+<style>
+  :root{
+    --azul-osc: #16305c;
+    --azul: #2a5cc9;
+    --azul-suave: #eef3fc;
+    --azul-borde: #d7e2f5;
+    --fondo: #f4f7fc;
+    --linea: #e7ecf5;
+    --verde: #1f8a4c;
+    --rojo: #c0392b;
+    --texto-tenue: #7c8aa3;
+    --app-max-width: 520px;
+  }
+  @media (min-width:900px){
+    main.grid-mode{
+      position:relative;
+      left:50%;
+      width:min(1800px, 96vw);
+      transform:translateX(-50%);
+    }
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--fondo);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:#1a1f2b;
+  }
+  #app{
+    display:flex; flex-direction:column;
+    height:100vh; height:100dvh;
+    max-width:var(--app-max-width); margin:0 auto;
+    background:var(--fondo);
+    transition:max-width .2s ease;
+  }
+
+  /* Header */
+  header{ padding:18px 20px 4px; flex-shrink:0; }
+  header .top-row{ display:flex; align-items:flex-start; justify-content:space-between; }
+  header h1{ font-size:27px; margin:0; color:#111624; font-weight:800; letter-spacing:-0.4px; }
+  header .sub{ font-size:14px; color:var(--azul); font-weight:700; margin-top:4px; letter-spacing:0.2px; }
+  .icon-btn{
+    background:#fff; border:1px solid var(--azul-borde); padding:11px; cursor:pointer;
+    color:var(--azul); display:flex; align-items:center; justify-content:center;
+    border-radius:12px; box-shadow:0 1px 2px rgba(22,48,92,0.06);
+  }
+  .icon-btn:active{ background:var(--azul-suave); }
+  .icon-btn.hidden{ display:none; }
+  .icon-btn.active{ background:var(--azul); color:#fff; border-color:var(--azul); }
+  .icon-btn svg{ width:19px; height:19px; }
+  .icon-btn.spinning svg{ animation: spin 0.8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* Pill tabs */
+  .pill-tabs{
+    display:flex; gap:4px;
+    background:#fff; border:1px solid var(--azul-borde);
+    border-radius:14px; padding:4px;
+    margin:14px 20px 0; flex-shrink:0;
+    box-shadow:0 1px 3px rgba(22,48,92,0.05);
+  }
+  .pill-tabs button{
+    flex:1; border:none; background:transparent; cursor:pointer;
+    padding:11px 8px; border-radius:11px;
+    font-size:15px; font-weight:700; color:var(--texto-tenue);
+    transition:background .15s, color .15s;
+  }
+  .pill-tabs button.active{
+    background:var(--azul); color:#fff;
+    box-shadow:0 2px 6px rgba(42,92,201,0.35);
+  }
+
+  /* Search */
+  .search-wrap{ padding:12px 20px 6px; flex-shrink:0; }
+  .search-wrap.hidden{ display:none; }
+  .search-wrap input{
+    width:100%; padding:11px 13px; border-radius:11px; border:1px solid var(--azul-borde);
+    background:#fff; font-size:16px; outline:none; color:#1a1f2b;
+  }
+  .search-wrap input:focus{ border-color:var(--azul); }
+  .search-wrap input::placeholder{ color:#a7b2c6; }
+
+  /* Content */
+  main{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 20px 24px; }
+  main.grid-mode{ display:flex; flex-direction:column; overflow:hidden; padding-bottom:12px; }
+  main.grid-mode .mov-table-wrap{ flex:1; min-height:0; display:flex; flex-direction:column; }
+
+  .state-msg{ padding:40px 20px; text-align:center; color:var(--texto-tenue); font-size:14px; }
+  .state-msg.error{ color:var(--rojo); }
+
+  /* Tabla Clientes (saldo por cliente) */
+  .stock-table-wrap{
+    border:1px solid var(--linea); border-radius:14px; overflow:hidden;
+    background:#fff; box-shadow:0 1px 2px rgba(22,48,92,0.04);
+  }
+  table.clientes{ border-collapse:collapse; width:100%; }
+  table.clientes td{
+    padding:11px 12px; border-bottom:1px solid var(--linea); border-right:1px solid var(--linea);
+    vertical-align:middle; text-align:center;
+  }
+  table.clientes td:last-child{ border-right:none; }
+  table.clientes tr:last-child td{ border-bottom:none; }
+  table.clientes tr:nth-child(even){ background:#fafbfd; }
+  table.clientes tr.cliente-row{ cursor:pointer; }
+  table.clientes tr.cliente-row:active{ background:var(--azul-suave); }
+  table.clientes td.nombre{ font-size:15.5px; font-weight:700; color:#1a1f2b; text-align:center; }
+  table.clientes td.reparto{ font-size:13px; font-weight:600; color:var(--texto-tenue); width:96px; white-space:nowrap; }
+  table.clientes td.fecha{ font-size:13px; font-weight:700; color:var(--azul); width:88px; white-space:nowrap; }
+  table.clientes td.saldo{ font-size:16px; font-weight:800; color:#1a1f2b; width:110px; white-space:nowrap; }
+  table.clientes td.saldo.pos{ color:var(--rojo); }
+  table.clientes td.saldo.zero{ color:#9aa5ba; font-weight:600; }
+  table.clientes th{
+    text-align:center; font-size:12.5px; font-weight:800; color:var(--texto-tenue);
+    text-transform:uppercase; letter-spacing:0.3px;
+    padding:9px 12px; border-bottom:1.5px solid var(--linea); border-right:1px solid var(--linea);
+    background:#fafbfd;
+  }
+  table.clientes th:last-child{ border-right:none; }
+  table.clientes th.nombre{ text-align:center; }
+  table.clientes tr.total-row td{ background:#eef3fc; border-top:1.5px solid var(--azul-borde); }
+  table.clientes tr.total-row td.nombre{ color:var(--azul-osc); font-weight:800; text-align:center; }
+  table.clientes tr.total-row td.saldo{ font-size:16.5px; color:var(--azul-osc); }
+  table.clientes tr.total-row td.saldo.pos{ color:var(--rojo); }
+  table.clientes tr.cliente-row.selected td{ background:var(--azul-suave); }
+  table.clientes tr.cliente-row.selected td.nombre{ color:var(--azul-osc); }
+
+  /* Tabla Resumen (saldo por categoría de reparto) */
+  table.resumen{ border-collapse:collapse; width:100%; }
+  table.resumen td{
+    padding:12px; border-bottom:1px solid var(--linea); border-right:1px solid var(--linea);
+    vertical-align:middle; text-align:center;
+  }
+  table.resumen td:last-child{ border-right:none; }
+  table.resumen tr:last-child td{ border-bottom:none; }
+  table.resumen tr:nth-child(even){ background:#fafbfd; }
+  table.resumen td.categoria{ font-size:15.5px; font-weight:700; color:#1a1f2b; }
+  table.resumen td.saldo{ font-size:16px; font-weight:800; color:#1a1f2b; }
+  table.resumen td.saldo.pos{ color:var(--rojo); }
+  table.resumen td.saldo.zero{ color:#9aa5ba; font-weight:600; }
+  table.resumen th{
+    text-align:center; font-size:12.5px; font-weight:800; color:var(--texto-tenue);
+    text-transform:uppercase; letter-spacing:0.3px;
+    padding:9px 12px; border-bottom:1.5px solid var(--linea); border-right:1px solid var(--linea);
+    background:#fafbfd;
+  }
+  table.resumen th:last-child{ border-right:none; }
+  table.resumen tr.total-row td{ background:#eef3fc; border-top:1.5px solid var(--azul-borde); }
+  table.resumen tr.total-row td.categoria{ color:var(--azul-osc); font-weight:800; }
+  table.resumen tr.total-row td.saldo{ font-size:16.5px; color:var(--azul-osc); }
+  table.resumen tr.total-row td.saldo.pos{ color:var(--rojo); }
+
+  /* Tabla Movimientos */
+  .mov-table-wrap{
+    border:1.5px solid var(--azul); border-radius:14px; overflow:hidden;
+    background:#fff; box-shadow:0 1px 3px rgba(22,48,92,0.08);
+  }
+  .mov-scroll{ overflow:auto; -webkit-overflow-scrolling:touch; }
+  table.mov{ border-collapse:separate; border-spacing:0; width:100%; min-width:1080px; }
+  table.mov th{
+    position:sticky; top:0; background:#fff; z-index:1;
+    text-align:center; font-size:15px; color:#1a1f2b; font-weight:800;
+    padding:14px 16px; border-bottom:2px solid var(--azul); white-space:nowrap;
+    border-right:1px solid var(--linea);
+    box-shadow:0 2px 4px rgba(22,48,92,0.15);
+  }
+  table.mov th:last-child{ border-right:none; }
+  table.mov td{
+    padding:14px 16px; font-size:16px; white-space:nowrap; text-align:center;
+    border-bottom:1px solid var(--linea); border-right:1px solid var(--linea);
+    color:#1a1f2b;
+  }
+  table.mov td:last-child{ border-right:none; }
+  table.mov td.fecha{ color:var(--azul); font-weight:700; }
+  table.mov td.cliente{ font-weight:700; }
+  table.mov td.num{ text-align:center; font-weight:700; }
+  table.mov td.num.pos{ color:var(--verde); }
+  table.mov td.num.neg{ color:var(--rojo); }
+  table.mov td.num.zero{ color:#c3cad9; font-weight:500; }
+  table.mov tbody tr:nth-child(even){ background:#fafbfd; }
+  table.mov tbody tr.mov-row{ cursor:pointer; }
+  table.mov tbody tr.mov-row:active{ background:var(--azul-suave); }
+  table.mov tbody tr.mov-row.selected td{ background:var(--azul-suave); }
+  table.mov tbody tr.mov-row.selected td.fecha{ color:var(--azul-osc); }
+
+  /* Modal de confirmación (eliminar) */
+  #confirm-eliminar-modal{
+    position:fixed; inset:0; z-index:200;
+    background:rgba(17,22,36,0.55);
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  #confirm-eliminar-modal.hidden{ display:none; }
+  .confirm-box{
+    width:100%; max-width:320px;
+    background:#fff; border-radius:18px;
+    padding:26px 22px 20px;
+    text-align:center;
+    box-shadow:0 12px 30px rgba(17,22,36,0.25);
+  }
+  .confirm-box .confirm-icon{
+    width:52px; height:52px; border-radius:50%;
+    background:#fdecea; color:var(--rojo);
+    display:flex; align-items:center; justify-content:center;
+    margin:0 auto 14px;
+  }
+  .confirm-box .confirm-icon svg{ width:24px; height:24px; }
+  .confirm-box h3{ font-size:17px; margin:0 0 6px; color:#111624; font-weight:800; }
+  .confirm-box p{ font-size:14px; color:var(--texto-tenue); margin:0 0 20px; line-height:1.4; }
+  .confirm-box .confirm-actions{ display:flex; gap:10px; }
+  .confirm-box button{ flex:1; padding:12px; border-radius:12px; border:none; font-size:15px; font-weight:700; cursor:pointer; }
+  .confirm-box .btn-cancelar{ background:var(--azul-suave); color:var(--azul-osc); }
+  .confirm-box .btn-cancelar:active{ background:var(--azul-borde); }
+  .confirm-box .btn-confirmar{ background:var(--rojo); color:#fff; }
+  .confirm-box .btn-confirmar:active{ opacity:0.85; }
+
+  /* Botón flotante (+) para nuevo movimiento */
+  .fab{
+    position:fixed; bottom:28px; right:22px;
+    width:56px; height:56px; border-radius:50%;
+    background:var(--azul); color:#fff; border:none;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 16px rgba(42,92,201,0.45);
+    cursor:pointer; z-index:50;
+  }
+  .fab.hidden{ display:none; }
+  .fab svg{ width:26px; height:26px; }
+  .fab:active{ transform:scale(0.94); }
+
+  .fab-acciones{
+    position:fixed; bottom:96px; right:22px;
+    display:flex; flex-direction:column; gap:12px; z-index:50;
+  }
+  .fab-acciones.hidden{ display:none; }
+  .fab-accion{
+    width:56px; height:56px; border-radius:50%;
+    background:var(--azul); color:#fff; border:none;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 16px rgba(42,92,201,0.45);
+    cursor:pointer;
+  }
+  .fab-accion.copiar{ background:#5a6787; box-shadow:0 6px 16px rgba(90,103,135,0.4); }
+  .fab-accion.editar{ background:#5f8fe0; box-shadow:0 6px 16px rgba(95,143,224,0.4); }
+  .fab-accion.eliminar{ background:#f0908d; box-shadow:0 6px 16px rgba(240,144,141,0.4); }
+  .fab-accion svg{ width:24px; height:24px; }
+  .fab-accion:active{ opacity:0.88; }
+
+  /* Modal Nuevo Movimiento */
+  #nuevo-modal{
+    position:fixed; inset:0; z-index:150;
+    background:rgba(17,22,36,0.55);
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  #nuevo-modal.hidden{ display:none; }
+  #nuevo-cliente-modal{
+    position:fixed; inset:0; z-index:150;
+    background:rgba(17,22,36,0.55);
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  #nuevo-cliente-modal.hidden{ display:none; }
+  .nuevo-box{
+    width:100%; max-width:520px; max-height:88vh;
+    background:#fff; border-radius:20px 20px 0 0;
+    display:flex; flex-direction:column;
+    box-shadow:0 -8px 24px rgba(17,22,36,0.25);
+  }
+  .nuevo-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 20px 14px; border-bottom:1px solid var(--linea); flex-shrink:0;
+  }
+  .nuevo-header h3{ margin:0; font-size:19px; font-weight:800; color:#111624; }
+  .nuevo-close{
+    background:none; border:none; font-size:26px; line-height:1; cursor:pointer;
+    color:var(--texto-tenue); padding:4px 8px;
+  }
+  .nuevo-body{ padding:18px 20px 8px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .nuevo-body label{
+    display:block; font-size:13px; font-weight:700; color:var(--azul-osc);
+    margin:16px 0 6px;
+  }
+  .nuevo-body label:first-of-type{ margin-top:0; }
+  .nuevo-body input[type="text"],
+  .nuevo-body input[type="date"]{
+    width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--azul-borde);
+    background:#fff; font-size:16px; outline:none; color:#1a1f2b;
+  }
+  .nuevo-body input:focus{ border-color:var(--azul); }
+  .nuevo-body input[readonly]{ background:#f4f7fc; color:var(--texto-tenue); }
+
+  .nm-reparto-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .nm-reparto-btn{
+    border:1px solid var(--azul-borde); background:#fff; cursor:pointer;
+    padding:12px 8px; border-radius:12px;
+    font-size:14.5px; font-weight:700; color:var(--texto-tenue);
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .nm-reparto-btn.selected{ background:var(--azul); color:#fff; border-color:var(--azul); }
+  .nm-reparto-grid.bloqueado .nm-reparto-btn{ cursor:not-allowed; opacity:0.55; }
+  .nm-reparto-grid.bloqueado .nm-reparto-btn.selected{ opacity:1; }
+  .nm-reparto-hint{ font-size:12.5px; color:var(--texto-tenue); margin-top:6px; line-height:1.4; }
+
+  .nuevo-importes-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+  .nm-saldos-grid{ grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .nm-saldos-grid input[readonly]{
+    text-align:center; font-weight:800; font-size:14.5px; padding:11px 6px;
+  }
+  .nm-saldos-grid input.saldo-debe{ color:var(--rojo); background:#fdf2f1; border-color:#f5d6d2; }
+  .nm-saldos-grid input.saldo-favor{ color:var(--verde); background:#f1f9f4; border-color:#cdeadb; }
+  .nm-saldos-grid input.saldo-cero{ color:#9aa5ba; }
+
+  .nuevo-hint{ font-size:12.5px; color:var(--texto-tenue); margin-top:6px; line-height:1.4; }
+
+  .nuevo-error{ padding:0 20px; color:var(--rojo); font-size:13.5px; font-weight:600; min-height:18px; }
+  .nuevo-footer{
+    display:flex; gap:10px; padding:14px 20px 20px; flex-shrink:0;
+    border-top:1px solid var(--linea);
+  }
+  .nuevo-footer button{
+    flex:1; padding:14px; border-radius:13px; border:none;
+    font-size:15.5px; font-weight:700; cursor:pointer;
+  }
+  .btn-cancelar{ background:var(--azul-suave); color:var(--azul-osc); }
+  .btn-cancelar:active{ background:var(--azul-borde); }
+  .btn-guardar{ background:var(--azul); color:#fff; }
+  .btn-guardar:active{ opacity:0.9; }
+  .btn-guardar:disabled{ opacity:0.6; }
+</style>
+</head>
+<body>
+
+<div id="confirm-eliminar-modal" class="hidden">
+  <div class="confirm-box">
+    <div class="confirm-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    </div>
+    <h3 id="confirm-eliminar-titulo">Eliminar movimiento</h3>
+    <p id="confirm-eliminar-texto">Esta acción borra el movimiento de forma permanente, tanto de la app como del Google Sheet, y recalcula el saldo del cliente. No se puede deshacer.</p>
+    <div class="confirm-actions">
+      <button class="btn-cancelar" id="confirm-eliminar-cancelar">Cancelar</button>
+      <button class="btn-confirmar" id="confirm-eliminar-aceptar">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div id="fab-acciones" class="fab-acciones hidden">
+  <button id="fab-copiar" class="fab-accion copiar" aria-label="Copiar movimiento">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+  </button>
+  <button id="fab-editar" class="fab-accion editar" aria-label="Editar movimiento">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+  </button>
+  <button id="fab-eliminar" class="fab-accion eliminar" aria-label="Eliminar movimiento">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+  </button>
+</div>
+
+<button id="fab-nuevo" class="fab hidden" aria-label="Nuevo movimiento">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<div id="nuevo-modal" class="hidden">
+  <div class="nuevo-box">
+    <div class="nuevo-header">
+      <h3 id="nuevo-titulo">Nuevo movimiento</h3>
+      <button class="nuevo-close" id="nuevo-cerrar" aria-label="Cerrar">×</button>
+    </div>
+    <div class="nuevo-body">
+      <input type="hidden" id="nm-edit-id">
+
+      <label>Fecha</label>
+      <input type="date" id="nm-fecha">
+
+      <label>Cliente</label>
+      <input type="text" id="nm-cliente" placeholder="Ej: Fernanda" list="lista-clientes" autocomplete="off">
+      <datalist id="lista-clientes"></datalist>
+
+      <label>Reparto</label>
+      <div class="nm-reparto-grid" id="nm-reparto-grid"></div>
+      <input type="hidden" id="nm-reparto">
+      <div class="nm-reparto-hint" id="nm-reparto-hint"></div>
+
+      <div class="nuevo-importes-grid">
+        <div>
+          <label for="nm-importe">Importe</label>
+          <input type="text" inputmode="decimal" id="nm-importe" placeholder="$0">
+        </div>
+        <div>
+          <label for="nm-entrego">Entregó</label>
+          <input type="text" inputmode="decimal" id="nm-entrego" placeholder="$0">
+        </div>
+      </div>
+      <div class="nuevo-hint">Importe = lo que se le carga al cliente. Entregó = lo que pagó.</div>
+
+      <div class="nuevo-importes-grid nm-saldos-grid">
+        <div>
+          <label for="nm-saldo-anterior">Saldo anterior</label>
+          <input type="text" id="nm-saldo-anterior" readonly>
+        </div>
+        <div>
+          <label for="nm-saldo">Saldo</label>
+          <input type="text" id="nm-saldo" readonly>
+        </div>
+        <div>
+          <label for="nm-saldo-acumulado">Saldo acumulado</label>
+          <input type="text" id="nm-saldo-acumulado" readonly>
+        </div>
+      </div>
+      <div class="nuevo-hint">Vista previa: el valor definitivo lo calcula el servidor al guardar, según el orden real de fechas.</div>
+    </div>
+    <div class="nuevo-error" id="nuevo-error"></div>
+    <div class="nuevo-footer">
+      <button class="btn-cancelar" id="nuevo-cancelar-btn">Cancelar</button>
+      <button class="btn-guardar" id="nuevo-guardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="nuevo-cliente-modal" class="hidden">
+  <div class="nuevo-box">
+    <div class="nuevo-header">
+      <h3 id="nc-titulo">Nuevo cliente</h3>
+      <button class="nuevo-close" id="nc-cerrar" aria-label="Cerrar">×</button>
+    </div>
+    <div class="nuevo-body">
+      <input type="hidden" id="nc-nombre-original">
+
+      <label>Nombre</label>
+      <input type="text" id="nc-nombre" placeholder="Ej: Fernanda" autocomplete="off">
+
+      <label>Reparto</label>
+      <div class="nm-reparto-grid" id="nc-reparto-grid"></div>
+      <input type="hidden" id="nc-reparto">
+    </div>
+    <div class="nuevo-error" id="nc-error"></div>
+    <div class="nuevo-footer">
+      <button class="btn-cancelar" id="nc-cancelar-btn">Cancelar</button>
+      <button class="btn-guardar" id="nc-guardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+
+  <header>
+    <div class="top-row">
+      <div>
+        <h1 id="header-title">Clientes</h1>
+        <div class="sub">Distribuidora Don Picconi</div>
+      </div>
+      <div style="display:flex; gap:22px;">
+        <button class="icon-btn hidden" id="btn-ocultar-cero" aria-label="Ocultar clientes en $0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.6 10.6 0 0 1 12 4c7 0 11 8 11 8a20.6 20.6 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+        <button class="icon-btn hidden" id="btn-compartir" aria-label="Compartir saldos">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        </button>
+        <button class="icon-btn" id="btn-refresh" aria-label="Actualizar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="pill-tabs">
+    <button id="tab-clientes" data-tab="clientes" class="active">Clientes</button>
+    <button id="tab-mov" data-tab="movimientos">Movimientos</button>
+    <button id="tab-resumen" data-tab="resumen">Resumen</button>
+  </div>
+
+  <div class="search-wrap" id="search-wrap">
+    <input type="text" id="search" placeholder="Buscar...">
+  </div>
+
+  <main id="main">
+    <div class="state-msg" id="loading">Cargando datos...</div>
+  </main>
+
+</div>
+
+<script>
+/* ============== CONFIGURACIÓN ============== */
+const CONFIG = {
+  // Pegá acá la URL de tu Web App de Apps Script (termina en /exec)
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxM4o52xS_sd04ZPLw-6muHybZogHy0vH5xCoiICTFIUMrt4iZj0YNQz4CzGBJDh3vI5Q/exec',
+
+  CAMPO_FECHA: 'Fecha',
+  REPARTOS: ['Granja', 'Reparto 1', 'Reparto 2', 'Reparto 3']
+};
+/* ============================================= */
+
+let movimientos = [];
+let clientes = [];
+let currentTab = 'clientes';
+
+const mainEl = document.getElementById('main');
+const searchEl = document.getElementById('search');
+const searchWrapEl = document.getElementById('search-wrap');
+const headerTitle = document.getElementById('header-title');
+const btnRefresh = document.getElementById('btn-refresh');
+const btnOcultarCero = document.getElementById('btn-ocultar-cero');
+const btnCompartir = document.getElementById('btn-compartir');
+
+function formatFecha(valor){
+  if(!valor) return '-';
+  const d = new Date(valor);
+  if(isNaN(d)) return String(valor);
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+function fechaLocalInput(d){
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Formatea un monto de plata: sin decimales si el número es entero,
+// negativos con signo menos delante.
+function formatMoneda(n){
+  const num = Number(n || 0);
+  const redondeado = Math.round((num + Number.EPSILON) * 100) / 100;
+  const abs = Math.abs(redondeado);
+  const esEntero = abs % 1 === 0;
+  const str = '$' + abs.toLocaleString('es-AR', {
+    minimumFractionDigits: esEntero ? 0 : 2,
+    maximumFractionDigits: 2
+  });
+  return redondeado < 0 ? `-${str}` : str;
+}
+
+async function cargarDatos(){
+  btnRefresh.classList.add('spinning');
+  try{
+    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {cache:'no-store'});
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if(data && data.error){
+      movimientos = [];
+      clientes = [];
+      mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos: ${data.error}</div>`;
+      return;
+    }
+    movimientos = data.movimientos || [];
+    clientes = data.clientes || [];
+    actualizarListaClientes();
+    if(currentTab === 'movimientos') irAlFondoMovimientos = true;
+    render();
+  }catch(err){
+    mainEl.innerHTML = `<div class="state-msg error">No se pudo cargar el Google Sheet.<br>${err.message}<br><br>Revisá que CONFIG.APPS_SCRIPT_URL esté bien configurada.</div>`;
+  }finally{
+    btnRefresh.classList.remove('spinning');
+  }
+}
+
+/* ============== Pestaña Clientes (lista maestra + saldo) ============== */
+let ocultarSinSaldo = false;
+let ultimaListaClientesVisible = [];
+
+function calcularSaldosClientes(){
+  return clientes
+    .map(c => ({
+      nombre: String(c['Cliente'] || '').trim(),
+      reparto: c['Reparto'] || '',
+      fecha: c['Fecha Último Movimiento'] || '',
+      saldo: parseFloat(c['Saldo Acumulado']) || 0
+    }))
+    .filter(c => c.nombre);
+}
+
+function renderClientes(filtro){
+  const clientes = calcularSaldosClientes()
+    .filter(c => {
+      if(!filtro) return true;
+      const texto = `${c.nombre} ${c.reparto}`.toLowerCase();
+      return texto.includes(filtro.toLowerCase());
+    })
+    .filter(c => {
+      if(!ocultarSinSaldo) return true;
+      const redondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
+      return redondeado !== 0;
+    })
+    .sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+  ultimaListaClientesVisible = clientes;
+
+  if(!clientes.length){
+    mainEl.innerHTML = `<div class="state-msg">Sin clientes que coincidan.</div>`;
+    return;
+  }
+
+  const totalGeneral = clientes.reduce((acc, c) => acc + c.saldo, 0);
+
+  const filas = clientes.map(c => {
+    const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
+    const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
+    return `<tr class="cliente-row" data-cliente="${c.nombre.replace(/"/g,'&quot;')}">
+      <td class="fecha">${formatFecha(c.fecha)}</td>
+      <td class="nombre">${c.nombre}</td>
+      <td class="reparto">${c.reparto || '-'}</td>
+      <td class="saldo ${cls}">${formatMoneda(c.saldo)}</td>
+    </tr>`;
+  }).join('');
+
+  const claseTotal = totalGeneral > 0 ? 'pos' : (totalGeneral < 0 ? 'neg' : 'zero');
+  const filaTotal = `<tr class="total-row">
+    <td class="nombre" colspan="3">Total</td>
+    <td class="saldo ${claseTotal}">${formatMoneda(totalGeneral)}</td>
+  </tr>`;
+
+  mainEl.innerHTML = `
+    <div class="stock-table-wrap">
+      <table class="clientes">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th class="nombre">Cliente</th>
+            <th>Reparto</th>
+            <th>Saldo</th>
+          </tr>
+        </thead>
+        <tbody>${filas}${filaTotal}</tbody>
+      </table>
+    </div>`;
+
+  mainEl.querySelectorAll('tr.cliente-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const nombre = tr.dataset.cliente;
+      clienteSeleccionadoNombre = (clienteSeleccionadoNombre === nombre) ? null : nombre;
+      actualizarSeleccionUI();
+    });
+  });
+  actualizarSeleccionUI();
+}
+
+/* ============== Pestaña Resumen (saldo por categoría de reparto) ============== */
+function renderResumen(){
+  const porCategoria = {};
+  CONFIG.REPARTOS.forEach(r => { porCategoria[r] = 0; });
+
+  let totalGeneral = 0;
+  calcularSaldosClientes().forEach(c => {
+    const categoria = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
+    porCategoria[categoria] = (porCategoria[categoria] || 0) + c.saldo;
+    totalGeneral += c.saldo;
+  });
+
+  const categorias = Object.keys(porCategoria)
+    .filter(cat => CONFIG.REPARTOS.includes(cat) || porCategoria[cat] !== 0)
+    .sort((a, b) => {
+      const ia = CONFIG.REPARTOS.indexOf(a);
+      const ib = CONFIG.REPARTOS.indexOf(b);
+      if(ia === -1) return 1;
+      if(ib === -1) return -1;
+      return ia - ib;
+    });
+
+  const filas = categorias.map(cat => {
+    const saldo = porCategoria[cat];
+    const saldoRedondeado = Math.round((saldo + Number.EPSILON) * 100) / 100;
+    const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
+    return `<tr>
+      <td class="categoria">${cat}</td>
+      <td class="saldo ${cls}">${formatMoneda(saldo)}</td>
+    </tr>`;
+  }).join('');
+
+  const claseTotal = totalGeneral > 0 ? 'pos' : (totalGeneral < 0 ? 'neg' : 'zero');
+  const filaTotal = `<tr class="total-row">
+    <td class="categoria">Totales</td>
+    <td class="saldo ${claseTotal}">${formatMoneda(totalGeneral)}</td>
+  </tr>`;
+
+  mainEl.innerHTML = `
+    <div class="stock-table-wrap">
+      <table class="resumen">
+        <thead>
+          <tr>
+            <th>Tipo de Reparto</th>
+            <th>Saldo Acumulado</th>
+          </tr>
+        </thead>
+        <tbody>${filas}${filaTotal}</tbody>
+      </table>
+    </div>`;
+}
+
+/* ============== Pestaña Movimientos ============== */
+function renderMovimientos(filtro){
+  const ordenados = movimientos;
+
+  const filas = ordenados
+    .filter(mov => {
+      if(!filtro) return true;
+      const texto = `${mov['Cliente']||''} ${mov['Reparto']||''}`.toLowerCase();
+      return texto.includes(filtro.toLowerCase());
+    })
+    .map(mov => {
+      const importe = parseFloat(mov['Importe']);
+      const entrego = parseFloat(mov['Entregó']);
+      const saldoAnterior = parseFloat(mov['Saldo Anterior']);
+      const saldo = parseFloat(mov['Saldo']);
+      const saldoAcum = parseFloat(mov['Saldo Acumulado']);
+
+      const celdaImporte = !importe ? `<td class="num zero">-</td>` : `<td class="num pos">${formatMoneda(importe)}</td>`;
+      const celdaEntrego = !entrego ? `<td class="num zero">-</td>` : `<td class="num neg">${formatMoneda(entrego)}</td>`;
+      const clsSaldoAnterior = saldoAnterior > 0 ? 'neg' : (saldoAnterior < 0 ? 'pos' : 'zero');
+      const clsSaldo = saldo > 0 ? 'neg' : (saldo < 0 ? 'pos' : 'zero');
+      const clsSaldoAcum = saldoAcum > 0 ? 'neg' : (saldoAcum < 0 ? 'pos' : 'zero');
+
+      return `<tr class="mov-row" data-id="${mov['ID'] || ''}">
+        <td class="fecha">${formatFecha(mov[CONFIG.CAMPO_FECHA])}</td>
+        <td class="cliente">${mov['Cliente'] || '-'}</td>
+        <td>${mov['Reparto'] || '-'}</td>
+        ${celdaImporte}
+        ${celdaEntrego}
+        <td class="num ${clsSaldoAnterior}">${formatMoneda(saldoAnterior)}</td>
+        <td class="num ${clsSaldo}">${formatMoneda(saldo)}</td>
+        <td class="num ${clsSaldoAcum}">${formatMoneda(saldoAcum)}</td>
+      </tr>`;
+    }).join('');
+
+  if(!filas){
+    mainEl.innerHTML = `<div class="state-msg">Sin movimientos que coincidan.</div>`;
+    return;
+  }
+
+  mainEl.innerHTML = `
+    <div class="mov-table-wrap">
+      <div class="mov-scroll" id="mov-scroll">
+        <table class="mov">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Cliente</th><th>Reparto</th>
+              <th>Importe</th><th>Entregó</th>
+              <th>Saldo Anterior</th><th>Saldo</th><th>Saldo Acumulado</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  mainEl.querySelectorAll('tr.mov-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const id = tr.dataset.id;
+      filaSeleccionadaId = (filaSeleccionadaId === id) ? null : id;
+      actualizarSeleccionUI();
+    });
+  });
+  actualizarSeleccionUI();
+}
+
+function actualizarListaClientes(){
+  const nombres = clientes.map(c => String(c['Cliente']||'').trim()).filter(Boolean)
+    .sort((a,b) => a.localeCompare(b, 'es'));
+  document.getElementById('lista-clientes').innerHTML =
+    nombres.map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
+}
+
+/* ============== Scroll / tabs ============== */
+const scrollState = { clientes: 0, movimientos: { top: 0, left: 0 }, resumen: 0 };
+let irAlFondoMovimientos = false;
+
+function guardarScrollActual(){
+  if(currentTab === 'movimientos'){
+    const movScroll = document.getElementById('mov-scroll');
+    if(movScroll){
+      scrollState.movimientos.top = movScroll.scrollTop;
+      scrollState.movimientos.left = movScroll.scrollLeft;
+    }
+  }else if(currentTab === 'resumen'){
+    scrollState.resumen = mainEl.scrollTop;
+  }else{
+    scrollState.clientes = mainEl.scrollTop;
+  }
+}
+
+function restaurarScroll(){
+  if(currentTab === 'movimientos'){
+    const movScroll = document.getElementById('mov-scroll');
+    if(movScroll){
+      if(irAlFondoMovimientos){
+        movScroll.scrollTop = movScroll.scrollHeight;
+        movScroll.scrollLeft = 0;
+        irAlFondoMovimientos = false;
+      }else{
+        movScroll.scrollTop = scrollState.movimientos.top;
+        movScroll.scrollLeft = scrollState.movimientos.left;
+      }
+    }
+  }else if(currentTab === 'resumen'){
+    mainEl.scrollTop = scrollState.resumen;
+  }else{
+    mainEl.scrollTop = scrollState.clientes;
+  }
+}
+
+function render(){
+  const filtro = searchEl.value.trim();
+  mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
+  searchWrapEl.classList.toggle('hidden', currentTab === 'resumen');
+  fabNuevo.classList.toggle('hidden', currentTab === 'resumen');
+  btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
+  btnCompartir.classList.toggle('hidden', currentTab !== 'clientes');
+  if(currentTab === 'clientes'){
+    headerTitle.textContent = 'Clientes';
+    searchEl.placeholder = 'Buscar cliente...';
+    renderClientes(filtro);
+  }else if(currentTab === 'movimientos'){
+    headerTitle.textContent = 'Movimientos';
+    searchEl.placeholder = 'Buscar movimiento...';
+    renderMovimientos(filtro);
+  }else{
+    headerTitle.textContent = 'Resumen';
+    renderResumen();
+  }
+  restaurarScroll();
+  posicionarFabs();
+}
+
+function posicionarFabs(){
+  const wrap = document.querySelector('.mov-table-wrap, .stock-table-wrap');
+  const right = wrap ? Math.max(16, window.innerWidth - wrap.getBoundingClientRect().right + 22) : 22;
+  fabNuevo.style.right = right + 'px';
+  fabAcciones.style.right = right + 'px';
+}
+window.addEventListener('resize', posicionarFabs);
+
+function setTab(tab){
+  if(tab === currentTab) return;
+  guardarScrollActual();
+  currentTab = tab;
+  document.getElementById('tab-clientes').classList.toggle('active', tab === 'clientes');
+  document.getElementById('tab-mov').classList.toggle('active', tab === 'movimientos');
+  document.getElementById('tab-resumen').classList.toggle('active', tab === 'resumen');
+  deseleccionarFila();
+  render();
+}
+
+document.getElementById('tab-clientes').addEventListener('click', () => setTab('clientes'));
+document.getElementById('tab-mov').addEventListener('click', () => setTab('movimientos'));
+document.getElementById('tab-resumen').addEventListener('click', () => setTab('resumen'));
+
+btnRefresh.addEventListener('click', cargarDatos);
+searchEl.addEventListener('input', () => {
+  scrollState.clientes = 0;
+  scrollState.movimientos = { top: 0, left: 0 };
+  render();
+});
+
+// Ocultar/mostrar clientes con saldo $0 (solo afecta lo que se ve y lo
+// que se comparte; no borra ni modifica ningún dato).
+btnOcultarCero.addEventListener('click', () => {
+  ocultarSinSaldo = !ocultarSinSaldo;
+  btnOcultarCero.classList.toggle('active', ocultarSinSaldo);
+  btnOcultarCero.setAttribute('aria-label', ocultarSinSaldo ? 'Mostrar clientes en $0' : 'Ocultar clientes en $0');
+  render();
+});
+
+// Arma un texto prolijo con la lista de clientes actualmente visible
+// (respeta el buscador y el filtro de "ocultar en $0") y lo comparte:
+// usa el share nativo del celular si está disponible (para mandarlo
+// directo por WhatsApp, por ejemplo) y si no, lo copia al portapapeles.
+function armarTextoSaldos(){
+  const fecha = new Date().toLocaleDateString('es-AR');
+  const lineas = ultimaListaClientesVisible.map(c => `${c.nombre}: ${formatMoneda(c.saldo)}`);
+  const total = ultimaListaClientesVisible.reduce((acc, c) => acc + c.saldo, 0);
+  return [
+    'Saldos de clientes - Distribuidora Don Picconi',
+    `Fecha: ${fecha}`,
+    '',
+    ...(lineas.length ? lineas : ['(sin clientes que coincidan)']),
+    '',
+    `Total: ${formatMoneda(total)}`
+  ].join('\n');
+}
+
+btnCompartir.addEventListener('click', async () => {
+  const texto = armarTextoSaldos();
+
+  if(navigator.share){
+    try{
+      await navigator.share({ text: texto, title: 'Saldos de clientes' });
+      return;
+    }catch(err){
+      if(err && err.name === 'AbortError') return; // el usuario canceló
+      // si falla el share nativo, seguimos abajo con el portapapeles
+    }
+  }
+
+  const marcarCopiado = () => {
+    const original = btnCompartir.innerHTML;
+    btnCompartir.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    setTimeout(() => { btnCompartir.innerHTML = original; }, 1400);
+  };
+
+  // navigator.clipboard requiere contexto seguro (https/localhost); si
+  // la app se abre como archivo local (file://) no está disponible, así
+  // que hay un método de respaldo con un textarea + execCommand.
+  if(navigator.clipboard && window.isSecureContext){
+    try{
+      await navigator.clipboard.writeText(texto);
+      marcarCopiado();
+      return;
+    }catch(err){ /* seguimos con el respaldo */ }
+  }
+
+  try{
+    const textarea = document.createElement('textarea');
+    textarea.value = texto;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    if(!ok) throw new Error('execCommand falló');
+    marcarCopiado();
+  }catch(err){
+    alert('No se pudo copiar automáticamente. Este es el texto para copiar a mano:\n\n' + texto);
+  }
+});
+
+/* ============== Selección y FABs (Movimientos + Clientes) ============== */
+const fabNuevo = document.getElementById('fab-nuevo');
+const fabAcciones = document.getElementById('fab-acciones');
+const fabEditar = document.getElementById('fab-editar');
+const fabCopiar = document.getElementById('fab-copiar');
+const fabEliminar = document.getElementById('fab-eliminar');
+let filaSeleccionadaId = null;
+let clienteSeleccionadoNombre = null;
+
+// En la pestaña Movimientos, "copiar" duplica un movimiento. En la
+// pestaña Clientes, ese mismo botón se reutiliza para saltar a ver los
+// movimientos del cliente seleccionado (mismo ícono de FAB, otro uso).
+const ICONO_COPIAR_MOV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const ICONO_VER_MOVIMIENTOS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
+
+function actualizarIconosFabAcciones(){
+  if(currentTab === 'clientes'){
+    fabCopiar.innerHTML = ICONO_VER_MOVIMIENTOS;
+    fabCopiar.setAttribute('aria-label', 'Ver movimientos del cliente');
+    fabEditar.setAttribute('aria-label', 'Editar cliente');
+    fabEliminar.setAttribute('aria-label', 'Eliminar cliente');
+  }else{
+    fabCopiar.innerHTML = ICONO_COPIAR_MOV;
+    fabCopiar.setAttribute('aria-label', 'Copiar movimiento');
+    fabEditar.setAttribute('aria-label', 'Editar movimiento');
+    fabEliminar.setAttribute('aria-label', 'Eliminar movimiento');
+  }
+}
+
+function actualizarSeleccionUI(){
+  actualizarIconosFabAcciones();
+  if(currentTab === 'clientes'){
+    let encontrada = false;
+    mainEl.querySelectorAll('tr.cliente-row').forEach(tr => {
+      const esta = tr.dataset.cliente === clienteSeleccionadoNombre;
+      tr.classList.toggle('selected', esta);
+      if(esta) encontrada = true;
+    });
+    if(clienteSeleccionadoNombre && !encontrada) clienteSeleccionadoNombre = null;
+    fabAcciones.classList.toggle('hidden', !clienteSeleccionadoNombre);
+  }else{
+    let encontrada = false;
+    mainEl.querySelectorAll('tr.mov-row').forEach(tr => {
+      const esta = tr.dataset.id === filaSeleccionadaId;
+      tr.classList.toggle('selected', esta);
+      if(esta) encontrada = true;
+    });
+    if(filaSeleccionadaId && !encontrada) filaSeleccionadaId = null;
+    fabAcciones.classList.toggle('hidden', !filaSeleccionadaId);
+  }
+}
+
+function deseleccionarFila(){
+  filaSeleccionadaId = null;
+  clienteSeleccionadoNombre = null;
+  actualizarSeleccionUI();
+}
+
+const nuevoModal = document.getElementById('nuevo-modal');
+const nmRepartoGrid = document.getElementById('nm-reparto-grid');
+const nmReparto = document.getElementById('nm-reparto');
+const nmEditId = document.getElementById('nm-edit-id');
+const nuevoTitulo = document.getElementById('nuevo-titulo');
+const nmCliente = document.getElementById('nm-cliente');
+const nmFecha = document.getElementById('nm-fecha');
+const nmImporte = document.getElementById('nm-importe');
+const nmEntrego = document.getElementById('nm-entrego');
+const nuevoError = document.getElementById('nuevo-error');
+const btnGuardar = document.getElementById('nuevo-guardar');
+const nmSaldoAnterior = document.getElementById('nm-saldo-anterior');
+const nmSaldo = document.getElementById('nm-saldo');
+const nmSaldoAcumulado = document.getElementById('nm-saldo-acumulado');
+
+nmRepartoGrid.innerHTML = CONFIG.REPARTOS.map(r => `
+  <button type="button" class="nm-reparto-btn" data-reparto="${r}">${r}</button>
+`).join('');
+const nmRepartoHint = document.getElementById('nm-reparto-hint');
+
+function seleccionarReparto(valor){
+  nmReparto.value = valor;
+  nmRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.reparto === valor);
+  });
+}
+
+function bloquearRepartoGrid(bloqueado){
+  nmRepartoGrid.classList.toggle('bloqueado', bloqueado);
+  nmRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
+    btn.disabled = bloqueado;
+  });
+}
+
+// Busca el cliente tipeado/elegido en la lista maestra y autocompleta
+// el Reparto con el que tiene asignado en la pestaña Clientes. La
+// grilla queda SIEMPRE bloqueada en este formulario: el Reparto no se
+// elige a mano acá, se edita desde la pestaña Clientes. Si el cliente
+// todavía no tiene Reparto asignado, o el nombre no coincide con
+// ningún cliente cargado, la grilla queda igual bloqueada pero sin
+// ninguna opción seleccionada.
+function actualizarRepartoSegunCliente(){
+  const nombre = nmCliente.value.trim();
+  const cli = clientes.find(c => String(c['Cliente']||'').trim().toLowerCase() === nombre.toLowerCase());
+  const repartoCliente = cli ? String(cli['Reparto']||'').trim() : '';
+
+  seleccionarReparto(repartoCliente);
+  bloquearRepartoGrid(true);
+
+  if(cli && repartoCliente){
+    nmRepartoHint.textContent = 'Reparto del cliente (fijo). Para cambiarlo, editá el cliente en la pestaña Clientes.';
+  }else if(cli){
+    nmRepartoHint.textContent = 'Este cliente todavía no tiene Reparto asignado. Asignáselo desde la pestaña Clientes.';
+  }else{
+    nmRepartoHint.textContent = '';
+  }
+}
+
+// Pinta un valor de saldo en un input readonly, con color según signo
+// (deuda del cliente en rojo, saldo a favor en verde).
+function pintarSaldoPreview(input, valor){
+  input.value = formatMoneda(valor);
+  input.classList.remove('saldo-debe', 'saldo-favor', 'saldo-cero');
+  const redondeado = Math.round((valor + Number.EPSILON) * 100) / 100;
+  input.classList.add(redondeado > 0 ? 'saldo-debe' : (redondeado < 0 ? 'saldo-favor' : 'saldo-cero'));
+}
+
+// Vista previa de Saldo Anterior / Saldo / Saldo Acumulado del
+// movimiento que se está cargando o editando. "Saldo anterior" no mira
+// fechas: toma directamente el Saldo Acumulado actual del cliente (el
+// de la pestaña Clientes), que es el saldo que tiene antes de sumar
+// esta carga nueva. Si se está editando un movimiento existente, le
+// resta el aporte de ese mismo movimiento (su Saldo actual), para
+// mostrar el saldo que había antes de que ese movimiento existiera.
+// Es una estimación: el valor definitivo siempre lo recalcula el
+// servidor al guardar, en orden de fechas.
+function actualizarSaldosPreview(){
+  const nombre = nmCliente.value.trim().toLowerCase();
+  const editId = nmEditId.value;
+
+  const importe = parseFloat(limpiarCantidadParaEnvio(nmImporte.value.trim() || '0')) || 0;
+  const entrego = parseFloat(limpiarCantidadParaEnvio(nmEntrego.value.trim() || '0')) || 0;
+  const saldo = importe - entrego;
+
+  const cli = clientes.find(c => String(c['Cliente']||'').trim().toLowerCase() === nombre);
+  let saldoAnterior = cli ? (parseFloat(cli['Saldo Acumulado']) || 0) : 0;
+
+  if(editId){
+    const original = movimientos.find(m => String(m['ID']||'') === String(editId));
+    if(original && String(original['Cliente']||'').trim().toLowerCase() === nombre){
+      saldoAnterior -= parseFloat(original['Saldo']) || 0;
+    }
+  }
+
+  const saldoAcumulado = saldoAnterior + saldo;
+
+  pintarSaldoPreview(nmSaldoAnterior, saldoAnterior);
+  pintarSaldoPreview(nmSaldo, saldo);
+  pintarSaldoPreview(nmSaldoAcumulado, saldoAcumulado);
+}
+
+nmCliente.addEventListener('input', actualizarRepartoSegunCliente);
+nmCliente.addEventListener('input', actualizarSaldosPreview);
+nmFecha.addEventListener('input', actualizarSaldosPreview);
+nmFecha.addEventListener('change', actualizarSaldosPreview);
+[nmImporte, nmEntrego].forEach(inp => inp.addEventListener('input', actualizarSaldosPreview));
+
+nmRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if(btn.disabled) return;
+    seleccionarReparto(nmReparto.value === btn.dataset.reparto ? '' : btn.dataset.reparto);
+  });
+});
+
+// Formateo en vivo de Importe/Entregó: separador de miles, $ adelante.
+function formatearCantidad(valorCrudo){
+  const negativo = valorCrudo.trim().startsWith('-');
+  let limpio = valorCrudo.replace(/[^0-9,]/g, '');
+  const idxComa = limpio.indexOf(',');
+  let entero = idxComa === -1 ? limpio : limpio.slice(0, idxComa);
+  let decimal = idxComa === -1 ? null : limpio.slice(idxComa + 1).replace(/,/g, '');
+  entero = entero.slice(0, 10);
+  const enteroConPuntos = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  if(enteroConPuntos === '' && decimal === null){
+    return negativo ? '-' : '';
+  }
+  let resultado = (negativo ? '-' : '') + '$' + enteroConPuntos;
+  if(decimal !== null) resultado += ',' + decimal;
+  return resultado;
+}
+
+function limpiarCantidadParaEnvio(valorFormateado){
+  return valorFormateado.replace(/\$/g, '').replace(/\./g, '');
+}
+
+[nmImporte, nmEntrego].forEach(inp => {
+  inp.addEventListener('input', () => { inp.value = formatearCantidad(inp.value); });
+});
+
+function numeroAInputStr(num){
+  if(num === undefined || num === null || num === '') return '';
+  const n = parseFloat(num);
+  if(isNaN(n) || n === 0) return '';
+  return formatearCantidad(String(n).replace('.', ','));
+}
+
+function abrirNuevoModal(mov, modoEditar){
+  const precargar = !!mov;
+  nmEditId.value = (precargar && modoEditar) ? (mov['ID'] || '') : '';
+  nuevoTitulo.textContent = modoEditar ? 'Editar movimiento' : (precargar ? 'Copiar movimiento' : 'Nuevo movimiento');
+
+  nmCliente.value = precargar ? (mov['Cliente'] || '') : '';
+  actualizarRepartoSegunCliente();
+  nmFecha.value = precargar && mov[CONFIG.CAMPO_FECHA]
+    ? fechaLocalInput(new Date(mov[CONFIG.CAMPO_FECHA]))
+    : fechaLocalInput(new Date());
+
+  nmImporte.value = (precargar && modoEditar) ? numeroAInputStr(mov['Importe']) : '';
+  nmEntrego.value = (precargar && modoEditar) ? numeroAInputStr(mov['Entregó']) : '';
+  actualizarSaldosPreview();
+
+  nuevoError.textContent = '';
+  btnGuardar.disabled = false;
+  btnGuardar.textContent = modoEditar ? 'Guardar cambios' : (precargar ? 'Guardar copia' : 'Guardar');
+  nuevoModal.classList.remove('hidden');
+  document.querySelector('.nuevo-body').scrollTop = 0;
+}
+
+function cerrarNuevoModal(){
+  nuevoModal.classList.add('hidden');
+}
+
+fabNuevo.addEventListener('click', () => {
+  if(currentTab === 'clientes') abrirNuevoClienteModal();
+  else abrirNuevoModal();
+});
+document.getElementById('nuevo-cerrar').addEventListener('click', cerrarNuevoModal);
+document.getElementById('nuevo-cancelar-btn').addEventListener('click', cerrarNuevoModal);
+
+fabEditar.addEventListener('click', () => {
+  if(currentTab === 'clientes'){
+    const nombre = clienteSeleccionadoNombre;
+    const cli = clientes.find(c => String(c['Cliente']||'').trim() === nombre);
+    deseleccionarFila();
+    if(cli) abrirNuevoClienteModal(cli);
+  }else{
+    const mov = movimientos.find(m => String(m['ID']) === String(filaSeleccionadaId));
+    deseleccionarFila();
+    if(mov) abrirNuevoModal(mov, true);
+  }
+});
+
+fabCopiar.addEventListener('click', () => {
+  if(currentTab === 'clientes'){
+    const nombre = clienteSeleccionadoNombre;
+    deseleccionarFila();
+    if(nombre){
+      setTab('movimientos');
+      searchEl.value = nombre;
+      render();
+    }
+  }else{
+    const mov = movimientos.find(m => String(m['ID']) === String(filaSeleccionadaId));
+    deseleccionarFila();
+    if(mov) abrirNuevoModal(mov, false);
+  }
+});
+
+const confirmEliminarModal = document.getElementById('confirm-eliminar-modal');
+const confirmEliminarTitulo = document.getElementById('confirm-eliminar-titulo');
+const confirmEliminarTexto = document.getElementById('confirm-eliminar-texto');
+let idAEliminar = null;
+let clienteAEliminar = null;
+
+fabEliminar.addEventListener('click', () => {
+  if(currentTab === 'clientes'){
+    clienteAEliminar = clienteSeleccionadoNombre;
+    deseleccionarFila();
+    if(!clienteAEliminar) return;
+    confirmEliminarTitulo.textContent = 'Eliminar cliente';
+    confirmEliminarTexto.textContent = 'Esta acción borra el cliente de la lista, tanto de la app como del Google Sheet. Si el cliente tiene movimientos cargados, primero hay que eliminarlos. No se puede deshacer.';
+    confirmEliminarModal.classList.remove('hidden');
+  }else{
+    idAEliminar = filaSeleccionadaId;
+    deseleccionarFila();
+    if(!idAEliminar) return;
+    confirmEliminarTitulo.textContent = 'Eliminar movimiento';
+    confirmEliminarTexto.textContent = 'Esta acción borra el movimiento de forma permanente, tanto de la app como del Google Sheet, y recalcula el saldo del cliente. No se puede deshacer.';
+    confirmEliminarModal.classList.remove('hidden');
+  }
+});
+
+document.getElementById('confirm-eliminar-cancelar').addEventListener('click', () => {
+  confirmEliminarModal.classList.add('hidden');
+  idAEliminar = null;
+  clienteAEliminar = null;
+});
+
+document.getElementById('confirm-eliminar-aceptar').addEventListener('click', async () => {
+  if(!idAEliminar && !clienteAEliminar) return;
+  const payload = clienteAEliminar
+    ? { accion: 'eliminarCliente', cliente: clienteAEliminar }
+    : { accion: 'eliminar', id: idAEliminar };
+  const btnAceptar = document.getElementById('confirm-eliminar-aceptar');
+  btnAceptar.disabled = true;
+  btnAceptar.textContent = 'Eliminando...';
+  try{
+    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if(data && data.error) throw new Error(data.error);
+
+    confirmEliminarModal.classList.add('hidden');
+    idAEliminar = null;
+    clienteAEliminar = null;
+    await cargarDatos();
+  }catch(err){
+    alert('No se pudo eliminar: ' + err.message);
+  }finally{
+    btnAceptar.disabled = false;
+    btnAceptar.textContent = 'Eliminar';
+  }
+});
+
+/* ============== Nuevo / editar cliente ============== */
+const nuevoClienteModal = document.getElementById('nuevo-cliente-modal');
+const ncRepartoGrid = document.getElementById('nc-reparto-grid');
+const ncReparto = document.getElementById('nc-reparto');
+const ncNombreOriginal = document.getElementById('nc-nombre-original');
+const ncTitulo = document.getElementById('nc-titulo');
+const ncNombre = document.getElementById('nc-nombre');
+const ncError = document.getElementById('nc-error');
+const ncGuardar = document.getElementById('nc-guardar');
+
+ncRepartoGrid.innerHTML = CONFIG.REPARTOS.map(r => `
+  <button type="button" class="nm-reparto-btn" data-reparto="${r}">${r}</button>
+`).join('');
+
+function seleccionarRepartoCliente(valor){
+  ncReparto.value = valor;
+  ncRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.reparto === valor);
+  });
+}
+
+ncRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    seleccionarRepartoCliente(ncReparto.value === btn.dataset.reparto ? '' : btn.dataset.reparto);
+  });
+});
+
+function abrirNuevoClienteModal(cliente){
+  const editando = !!cliente;
+  ncNombreOriginal.value = editando ? String(cliente['Cliente'] || '') : '';
+  ncTitulo.textContent = editando ? 'Editar cliente' : 'Nuevo cliente';
+  ncNombre.value = editando ? String(cliente['Cliente'] || '') : '';
+  seleccionarRepartoCliente(editando ? (cliente['Reparto'] || '') : '');
+  ncError.textContent = '';
+  ncGuardar.disabled = false;
+  ncGuardar.textContent = editando ? 'Guardar cambios' : 'Guardar';
+  nuevoClienteModal.classList.remove('hidden');
+  document.querySelectorAll('#nuevo-cliente-modal .nuevo-body')[0].scrollTop = 0;
+}
+
+function cerrarNuevoClienteModal(){
+  nuevoClienteModal.classList.add('hidden');
+}
+
+document.getElementById('nc-cerrar').addEventListener('click', cerrarNuevoClienteModal);
+document.getElementById('nc-cancelar-btn').addEventListener('click', cerrarNuevoClienteModal);
+
+ncGuardar.addEventListener('click', async () => {
+  ncError.textContent = '';
+
+  const nombre = ncNombre.value.trim();
+  if(!nombre){
+    ncError.textContent = 'Completá el nombre del cliente.';
+    return;
+  }
+
+  const payload = {
+    accion: 'guardarCliente',
+    cliente: nombre,
+    reparto: ncReparto.value.trim()
+  };
+  if(ncNombreOriginal.value) payload.nombreOriginal = ncNombreOriginal.value;
+
+  ncGuardar.disabled = true;
+  ncGuardar.textContent = 'Guardando...';
+
+  try{
+    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if(data && data.error) throw new Error(data.error);
+
+    cerrarNuevoClienteModal();
+    await cargarDatos();
+  }catch(err){
+    ncError.textContent = 'No se pudo guardar: ' + err.message;
+  }finally{
+    ncGuardar.disabled = false;
+    ncGuardar.textContent = 'Guardar';
+  }
+});
+
+btnGuardar.addEventListener('click', async () => {
+  nuevoError.textContent = '';
+
+  const cliente = nmCliente.value.trim();
+  const reparto = nmReparto.value.trim();
+
+  if(!cliente){
+    nuevoError.textContent = 'Completá el cliente.';
+    return;
+  }
+  const clienteExiste = clientes.some(c => String(c['Cliente']||'').trim().toLowerCase() === cliente.toLowerCase());
+  if(!clienteExiste){
+    nuevoError.textContent = `"${cliente}" no está cargado en Clientes. Agregalo primero desde esa pestaña.`;
+    return;
+  }
+  if(!reparto){
+    nuevoError.textContent = 'Seleccioná un reparto.';
+    return;
+  }
+
+  const payload = {
+    cliente, reparto,
+    fecha: nmFecha.value,
+    importe: limpiarCantidadParaEnvio(nmImporte.value.trim() || '0'),
+    entrego: limpiarCantidadParaEnvio(nmEntrego.value.trim() || '0')
+  };
+  if(nmEditId.value) payload.id = nmEditId.value;
+
+  btnGuardar.disabled = true;
+  btnGuardar.textContent = 'Guardando...';
+
+  try{
+    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if(data && data.error) throw new Error(data.error);
+
+    cerrarNuevoModal();
+    await cargarDatos();
+  }catch(err){
+    nuevoError.textContent = 'No se pudo guardar: ' + err.message;
+  }finally{
+    btnGuardar.disabled = false;
+    btnGuardar.textContent = 'Guardar';
+  }
+});
+/* =================================================== */
+
+cargarDatos();
+
+/* ============== PWA: registro del Service Worker ============== */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      console.warn('No se pudo registrar el Service Worker:', err);
+    });
+  });
+}
+/* ================================================================ */
+</script>
+</body>
+</html>
