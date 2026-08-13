@@ -18,6 +18,9 @@
 <!-- Genera imágenes (para el botón "Compartir" de las pestañas Clientes y Movimientos) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
+<!-- Login con Google -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 <style>
   :root{
     --azul-osc: #16305c;
@@ -368,9 +371,31 @@
   .btn-guardar{ background:var(--azul); color:#fff; }
   .btn-guardar:active{ opacity:0.9; }
   .btn-guardar:disabled{ opacity:0.6; }
+
+  /* Pantalla de login */
+  #login-screen{
+    position:fixed; inset:0; z-index:300;
+    background:var(--fondo);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:24px; text-align:center;
+  }
+  #login-screen.hidden{ display:none; }
+  #login-screen h1{ font-size:24px; margin:0 0 4px; color:#111624; font-weight:800; }
+  #login-screen .sub{ font-size:14px; color:var(--azul); font-weight:700; margin-bottom:32px; }
+  #login-screen .login-error{ color:var(--rojo); font-size:13.5px; font-weight:600; margin-top:18px; max-width:300px; min-height:18px; }
+  #login-screen .login-checking{ color:var(--texto-tenue); font-size:14px; }
+  #google-btn-container{ min-height:44px; }
 </style>
 </head>
 <body>
+
+<div id="login-screen">
+  <h1>Clientes</h1>
+  <div class="sub">Distribuidora Don Picconi</div>
+  <div id="login-checking" class="login-checking">Verificando sesión...</div>
+  <div id="google-btn-container" style="display:none;"></div>
+  <div class="login-error" id="login-error"></div>
+</div>
 
 <div id="confirm-eliminar-modal" class="hidden">
   <div class="confirm-box">
@@ -524,6 +549,9 @@
         <button class="icon-btn" id="btn-refresh" aria-label="Actualizar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
+        <button class="icon-btn" id="btn-logout" aria-label="Cerrar sesión">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
     </div>
   </header>
@@ -549,10 +577,138 @@ const CONFIG = {
   // Pegá acá la URL de tu Web App de Apps Script (termina en /exec)
   APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxM4o52xS_sd04ZPLw-6muHybZogHy0vH5xCoiICTFIUMrt4iZj0YNQz4CzGBJDh3vI5Q/exec',
 
+  // Pegá acá el mismo Client ID que pusiste en Código.gs (Google Cloud
+  // Console > Credenciales > ID de cliente de OAuth 2.0 > Aplicación web)
+  GOOGLE_CLIENT_ID: 'PEGÁ_ACÁ_TU_CLIENT_ID.apps.googleusercontent.com',
+
   CAMPO_FECHA: 'Fecha',
   REPARTOS: ['Granja', 'Reparto 1', 'Reparto 2', 'Reparto 3']
 };
 /* ============================================= */
+
+/* ============== LOGIN CON GOOGLE ============== */
+const LOGIN_STORAGE_KEY = 'dp_clientes_login';
+
+const loginScreen = document.getElementById('login-screen');
+const loginChecking = document.getElementById('login-checking');
+const googleBtnContainer = document.getElementById('google-btn-container');
+const loginError = document.getElementById('login-error');
+const btnLogout = document.getElementById('btn-logout');
+
+function decodeJwt_(token){
+  try{
+    const base64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const json = decodeURIComponent(atob(base64).split('').map(c =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''));
+    return JSON.parse(json);
+  }catch(err){
+    return null;
+  }
+}
+
+function sesionGuardada(){
+  try{
+    const raw = localStorage.getItem(LOGIN_STORAGE_KEY);
+    if(!raw) return null;
+    const datos = JSON.parse(raw);
+    if(!datos.token || !datos.exp) return null;
+    // exp viene en segundos (formato JWT); le restamos un margen de 60s.
+    if(Date.now() / 1000 > datos.exp - 60) return null;
+    return datos;
+  }catch(err){
+    return null;
+  }
+}
+
+function guardarSesion(token, payload){
+  localStorage.setItem(LOGIN_STORAGE_KEY, JSON.stringify({
+    token: token,
+    email: payload.email,
+    exp: payload.exp
+  }));
+}
+
+function cerrarSesion(){
+  localStorage.removeItem(LOGIN_STORAGE_KEY);
+  if(window.google && google.accounts && google.accounts.id){
+    google.accounts.id.disableAutoSelect();
+  }
+  mostrarLogin();
+}
+
+function tokenActual(){
+  const sesion = sesionGuardada();
+  return sesion ? sesion.token : null;
+}
+
+function mostrarLogin(){
+  document.getElementById('app').style.display = 'none';
+  loginScreen.classList.remove('hidden');
+  loginChecking.style.display = 'none';
+  googleBtnContainer.style.display = 'block';
+  loginError.textContent = '';
+}
+
+function ocultarLogin(){
+  loginScreen.classList.add('hidden');
+  document.getElementById('app').style.display = '';
+}
+
+function manejarCredencial(response){
+  const payload = decodeJwt_(response.credential);
+  if(!payload){
+    loginError.textContent = 'No se pudo leer la respuesta de Google.';
+    return;
+  }
+  guardarSesion(response.credential, payload);
+  ocultarLogin();
+  cargarDatos();
+}
+
+function iniciarLogin(){
+  if(!window.google || !google.accounts || !google.accounts.id){
+    // La librería de Google todavía no cargó; reintentamos en breve.
+    setTimeout(iniciarLogin, 300);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: CONFIG.GOOGLE_CLIENT_ID,
+    callback: manejarCredencial
+  });
+  google.accounts.id.renderButton(googleBtnContainer, {
+    type: 'standard', size: 'large', theme: 'filled_blue', text: 'signin_with', shape: 'pill'
+  });
+
+  const sesion = sesionGuardada();
+  if(sesion){
+    ocultarLogin();
+    cargarDatos();
+  }else{
+    mostrarLogin();
+  }
+}
+
+btnLogout.addEventListener('click', () => {
+  if(confirm('¿Cerrar sesión?')) cerrarSesion();
+});
+/* ================================================ */
+
+// Helper: manda un POST al Apps Script agregando el token de sesión.
+// Si el backend responde que la sesión no es válida, cierra sesión sola.
+async function postAppsScript(payload){
+  const token = tokenActual();
+  if(!token){ cerrarSesion(); throw new Error('Sesión vencida. Iniciá sesión de nuevo.'); }
+  const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify(Object.assign({}, payload, { token }))
+  });
+  const data = await resp.json();
+  if(data && data.error && /no autenticado|sesión inválida|no tiene acceso|no autorizado/i.test(data.error)){
+    cerrarSesion();
+  }
+  return data;
+}
 
 let movimientos = [];
 let clientes = [];
@@ -599,10 +755,18 @@ function formatMoneda(n){
 async function cargarDatos(){
   btnRefresh.classList.add('spinning');
   try{
-    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {cache:'no-store'});
+    const token = tokenActual();
+    if(!token){ cerrarSesion(); return; }
+    const url = CONFIG.APPS_SCRIPT_URL + '?token=' + encodeURIComponent(token);
+    const resp = await fetch(url, {cache:'no-store'});
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     if(data && data.error){
+      if(/no autenticado|sesión inválida|no tiene acceso|no autorizado/i.test(data.error)){
+        cerrarSesion();
+        loginError.textContent = data.error;
+        return;
+      }
       movimientos = [];
       clientes = [];
       mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos: ${data.error}</div>`;
@@ -1310,11 +1474,7 @@ document.getElementById('confirm-eliminar-aceptar').addEventListener('click', as
   btnAceptar.disabled = true;
   btnAceptar.textContent = 'Eliminando...';
   try{
-    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-    const data = await resp.json();
+    const data = await postAppsScript(payload);
     if(data && data.error) throw new Error(data.error);
 
     confirmEliminarModal.classList.add('hidden');
@@ -1397,11 +1557,7 @@ ncGuardar.addEventListener('click', async () => {
   ncGuardar.textContent = 'Guardando...';
 
   try{
-    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-    const data = await resp.json();
+    const data = await postAppsScript(payload);
     if(data && data.error) throw new Error(data.error);
 
     cerrarNuevoClienteModal();
@@ -1446,11 +1602,7 @@ btnGuardar.addEventListener('click', async () => {
   btnGuardar.textContent = 'Guardando...';
 
   try{
-    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-    const data = await resp.json();
+    const data = await postAppsScript(payload);
     if(data && data.error) throw new Error(data.error);
 
     cerrarNuevoModal();
@@ -1464,7 +1616,7 @@ btnGuardar.addEventListener('click', async () => {
 });
 /* =================================================== */
 
-cargarDatos();
+iniciarLogin();
 
 /* ============== PWA: registro del Service Worker ============== */
 if('serviceWorker' in navigator){
