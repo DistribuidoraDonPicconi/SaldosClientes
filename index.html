@@ -338,13 +338,14 @@
   .nm-reparto-hint{ font-size:12.5px; color:var(--texto-tenue); margin-top:6px; line-height:1.4; }
 
   .nuevo-importes-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .nuevo-importes-grid > div:nth-child(3){ grid-column:1 / -1; }
   .nm-fecha-cliente-grid{ display:grid; grid-template-columns:1fr 1.3fr; gap:10px; }
   .nm-fecha-cliente-grid label{ margin-top:0; }
 
-  .nm-saldos-grid{ grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:24px; }
+  .nm-saldos-grid{ grid-template-columns:1fr 1fr; gap:8px; margin-top:24px; }
   .nm-saldos-grid label{ text-align:center; }
   .nm-saldos-grid input[readonly]{
-    text-align:center; font-weight:800; font-size:14.5px; padding:11px 6px;
+    text-align:center; font-weight:800; font-size:14.5px; padding:11px 10px;
   }
   .nm-saldos-grid input.saldo-debe{ color:var(--rojo); background:#fdf2f1; border-color:#f5d6d2; }
   .nm-saldos-grid input.saldo-favor{ color:var(--verde); background:#f1f9f4; border-color:#cdeadb; }
@@ -477,14 +478,11 @@
           <label for="nm-importe">Importe</label>
           <input type="text" inputmode="decimal" id="nm-importe" placeholder="$0">
         </div>
+        <div class="nm-reparto-hint" id="nm-reparto-hint"></div>
         <div>
           <label for="nm-entrego">Entregó</label>
           <input type="text" inputmode="decimal" id="nm-entrego" placeholder="$0">
         </div>
-      </div>
-      <div class="nm-reparto-hint" id="nm-reparto-hint"></div>
-
-      <div class="nuevo-importes-grid nm-saldos-grid">
         <div>
           <label for="nm-saldo-anterior">Saldo anterior</label>
           <input type="text" id="nm-saldo-anterior" readonly>
