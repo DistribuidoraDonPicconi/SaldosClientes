@@ -12,10 +12,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Clientes DP">
-<link rel="icon" href="icons/icon-192.png" type="image/png">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
 
-<!-- Genera imágenes (para el botón "Compartir" de la pestaña Clientes) -->
+<!-- Genera imágenes (para el botón "Compartir" de las pestañas Clientes y Movimientos) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <style>
@@ -283,20 +283,21 @@
   #nuevo-modal{
     position:fixed; inset:0; z-index:150;
     background:rgba(17,22,36,0.55);
-    display:flex; align-items:flex-end; justify-content:center;
+    display:flex; align-items:flex-start; justify-content:center;
   }
   #nuevo-modal.hidden{ display:none; }
   #nuevo-cliente-modal{
     position:fixed; inset:0; z-index:150;
     background:rgba(17,22,36,0.55);
-    display:flex; align-items:flex-end; justify-content:center;
+    display:flex; align-items:flex-start; justify-content:center;
   }
   #nuevo-cliente-modal.hidden{ display:none; }
   .nuevo-box{
     width:100%; max-width:520px; max-height:88vh;
-    background:#fff; border-radius:20px 20px 0 0;
+    background:#fff; border-radius:18px;
     display:flex; flex-direction:column;
-    box-shadow:0 -8px 24px rgba(17,22,36,0.25);
+    box-shadow:0 12px 32px rgba(17,22,36,0.28);
+    margin:0 14px;
   }
   .nuevo-header{
     display:flex; align-items:center; justify-content:space-between;
@@ -309,7 +310,7 @@
   }
   .nuevo-body{ padding:18px 20px 8px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .nuevo-body label{
-    display:block; font-size:13px; font-weight:700; color:var(--azul-osc);
+    display:block; font-size:15px; font-weight:800; color:var(--azul-osc);
     margin:16px 0 6px;
   }
   .nuevo-body label:first-of-type{ margin-top:0; }
@@ -334,14 +335,22 @@
   .nm-reparto-hint{ font-size:12.5px; color:var(--texto-tenue); margin-top:6px; line-height:1.4; }
 
   .nuevo-importes-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .nm-fecha-cliente-grid{ display:grid; grid-template-columns:1fr 1.3fr; gap:10px; }
+  .nm-fecha-cliente-grid label{ margin-top:0; }
 
-  .nm-saldos-grid{ grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .nm-saldos-grid{ grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:24px; }
+  .nm-saldos-grid label{ text-align:center; }
   .nm-saldos-grid input[readonly]{
     text-align:center; font-weight:800; font-size:14.5px; padding:11px 6px;
   }
   .nm-saldos-grid input.saldo-debe{ color:var(--rojo); background:#fdf2f1; border-color:#f5d6d2; }
   .nm-saldos-grid input.saldo-favor{ color:var(--verde); background:#f1f9f4; border-color:#cdeadb; }
   .nm-saldos-grid input.saldo-cero{ color:#9aa5ba; }
+
+  #nuevo-modal .nuevo-body label{ text-align:center; }
+  #nuevo-modal .nuevo-body input[type="text"],
+  #nuevo-modal .nuevo-body input[type="date"]{ text-align:center; }
+  #nuevo-modal .nm-reparto-hint{ text-align:center; }
 
   .nuevo-hint{ font-size:12.5px; color:var(--texto-tenue); margin-top:6px; line-height:1.4; }
 
@@ -422,19 +431,23 @@
     <div class="nuevo-body">
       <input type="hidden" id="nm-edit-id">
 
-      <label>Fecha</label>
-      <input type="date" id="nm-fecha">
-
-      <label>Cliente</label>
-      <input type="text" id="nm-cliente" placeholder="Ej: Fernanda" list="lista-clientes" autocomplete="off">
+      <div class="nm-fecha-cliente-grid">
+        <div>
+          <label for="nm-fecha">Fecha</label>
+          <input type="date" id="nm-fecha">
+        </div>
+        <div>
+          <label for="nm-cliente">Cliente</label>
+          <input type="text" id="nm-cliente" placeholder="Ej: Fernanda" list="lista-clientes" autocomplete="off">
+        </div>
+      </div>
       <datalist id="lista-clientes"></datalist>
 
-      <label>Reparto</label>
-      <div class="nm-reparto-grid" id="nm-reparto-grid"></div>
-      <input type="hidden" id="nm-reparto">
-      <div class="nm-reparto-hint" id="nm-reparto-hint"></div>
-
-      <div class="nuevo-importes-grid">
+      <div class="nuevo-importes-grid nm-saldos-grid">
+        <div>
+          <label for="nm-reparto">Reparto</label>
+          <input type="text" id="nm-reparto" readonly>
+        </div>
         <div>
           <label for="nm-importe">Importe</label>
           <input type="text" inputmode="decimal" id="nm-importe" placeholder="$0">
@@ -444,7 +457,7 @@
           <input type="text" inputmode="decimal" id="nm-entrego" placeholder="$0">
         </div>
       </div>
-      <div class="nuevo-hint">Importe = lo que se le carga al cliente. Entregó = lo que pagó.</div>
+      <div class="nm-reparto-hint" id="nm-reparto-hint"></div>
 
       <div class="nuevo-importes-grid nm-saldos-grid">
         <div>
@@ -460,7 +473,6 @@
           <input type="text" id="nm-saldo-acumulado" readonly>
         </div>
       </div>
-      <div class="nuevo-hint">Vista previa: el valor definitivo lo calcula el servidor al guardar, según el orden real de fechas.</div>
     </div>
     <div class="nuevo-error" id="nuevo-error"></div>
     <div class="nuevo-footer">
@@ -506,7 +518,7 @@
         <button class="icon-btn hidden" id="btn-ocultar-cero" aria-label="Ocultar clientes en $0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.6 10.6 0 0 1 12 4c7 0 11 8 11 8a20.6 20.6 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </button>
-        <button class="icon-btn hidden" id="btn-compartir" aria-label="Compartir saldos">
+        <button class="icon-btn hidden" id="btn-compartir" aria-label="Compartir">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         </button>
         <button class="icon-btn" id="btn-refresh" aria-label="Actualizar">
@@ -828,7 +840,7 @@ function render(){
   mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
   fabNuevo.classList.remove('hidden');
   btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
-  btnCompartir.classList.toggle('hidden', currentTab !== 'clientes');
+  btnCompartir.classList.remove('hidden');
   if(currentTab === 'clientes'){
     headerTitle.textContent = 'Clientes';
     searchEl.placeholder = 'Buscar cliente...';
@@ -879,7 +891,7 @@ btnOcultarCero.addEventListener('click', () => {
   render();
 });
 
-/* ============== Pestaña Clientes: generar y compartir imagen ============== */
+/* ============== Compartir imagen (Clientes y Movimientos) ============== */
 
 // Nombre de archivo con fecha, sin caracteres raros.
 function fechaParaArchivo(){
@@ -896,25 +908,36 @@ function marcarCompartirOk(){
   setTimeout(() => { btnCompartir.innerHTML = original; }, 1400);
 }
 
-// Arma una versión "prolija" de la tabla de Clientes (con título y
-// fecha arriba) fuera de pantalla, y la convierte en imagen con
-// html2canvas. Usa la tabla que se está viendo en ese momento (respeta
-// el buscador y el filtro de "ocultar en $0"), así la imagen coincide
-// con lo que aparece en pantalla.
-async function generarImagenClientes(){
+// Arma una versión "prolija" de la tabla que se esté viendo (Clientes o
+// Movimientos), con título y fecha arriba, fuera de pantalla, y la
+// convierte en imagen con html2canvas. Usa la tabla tal cual está en
+// pantalla en ese momento (respeta el buscador y, en Clientes, el
+// filtro de "ocultar en $0"), así la imagen coincide con lo que se ve.
+async function generarImagenTabla(){
   if(!window.html2canvas){
     throw new Error('No se pudo cargar la librería para generar imágenes. Revisá tu conexión a internet.');
   }
-  const wrap = mainEl.querySelector('.stock-table-wrap');
-  if(!wrap) throw new Error('No hay tabla de clientes para capturar.');
+  const esClientes = currentTab === 'clientes';
+  const wrap = mainEl.querySelector(esClientes ? '.stock-table-wrap' : '.mov-table-wrap');
+  if(!wrap) throw new Error('No hay tabla para capturar.');
 
+  const ancho = esClientes ? 480 : 1120;
   const contenedor = document.createElement('div');
-  contenedor.style.cssText = 'position:fixed; left:-9999px; top:0; width:480px; background:#ffffff; padding:22px; font-family:' + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';';
+  contenedor.style.cssText = `position:fixed; left:-9999px; top:0; width:${ancho}px; background:#ffffff; padding:22px; font-family:` + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';';
   contenedor.innerHTML = `
-    <div style="font-size:21px;font-weight:800;color:#111624;letter-spacing:-0.4px;margin-bottom:2px;">Clientes</div>
+    <div style="font-size:21px;font-weight:800;color:#111624;letter-spacing:-0.4px;margin-bottom:2px;">${esClientes ? 'Clientes' : 'Movimientos'}</div>
     <div style="font-size:14px;font-weight:700;color:#2a5cc9;margin-bottom:16px;">Distribuidora Don Picconi — ${new Date().toLocaleDateString('es-AR')}</div>
   `;
-  contenedor.appendChild(wrap.cloneNode(true));
+  const clon = wrap.cloneNode(true);
+  if(!esClientes){
+    // En Movimientos la tabla vive dentro de un contenedor con scroll
+    // propio (.mov-scroll); para la captura no queremos ese recorte,
+    // así que mostramos la tabla completa.
+    const scroll = clon.querySelector('.mov-scroll') || clon;
+    scroll.style.overflow = 'visible';
+    scroll.style.maxHeight = 'none';
+  }
+  contenedor.appendChild(clon);
   document.body.appendChild(contenedor);
 
   try{
@@ -964,7 +987,7 @@ btnCompartirWhatsapp.addEventListener('click', async () => {
   // Compartir nativo con imagen adjunta (celular: abre WhatsApp entre las opciones).
   if(navigator.canShare && navigator.canShare({ files: [archivo] })){
     try{
-      await navigator.share({ files: [archivo], title: 'Saldos de clientes' });
+      await navigator.share({ files: [archivo], title: currentTab === 'clientes' ? 'Saldos de clientes' : 'Movimientos' });
       marcarCompartirOk();
       cerrarCompartirModal();
       return;
@@ -982,12 +1005,14 @@ btnCompartir.addEventListener('click', async () => {
   btnCompartir.disabled = true;
   btnCompartir.classList.add('spinning');
   try{
-    const canvas = await generarImagenClientes();
+    const canvas = await generarImagenTabla();
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     if(!blob) throw new Error('No se pudo generar la imagen.');
 
     compartirBlobActual = blob;
-    compartirNombreActual = `saldos-clientes-${fechaParaArchivo()}.png`;
+    compartirNombreActual = currentTab === 'clientes'
+      ? `saldos-clientes-${fechaParaArchivo()}.png`
+      : `movimientos-${fechaParaArchivo()}.png`;
     compartirUrlActual = URL.createObjectURL(blob);
     compartirPreviewImg.src = compartirUrlActual;
     compartirModal.classList.remove('hidden');
@@ -1058,7 +1083,6 @@ function deseleccionarFila(){
 }
 
 const nuevoModal = document.getElementById('nuevo-modal');
-const nmRepartoGrid = document.getElementById('nm-reparto-grid');
 const nmReparto = document.getElementById('nm-reparto');
 const nmEditId = document.getElementById('nm-edit-id');
 const nuevoTitulo = document.getElementById('nuevo-titulo');
@@ -1072,43 +1096,22 @@ const nmSaldoAnterior = document.getElementById('nm-saldo-anterior');
 const nmSaldo = document.getElementById('nm-saldo');
 const nmSaldoAcumulado = document.getElementById('nm-saldo-acumulado');
 
-nmRepartoGrid.innerHTML = CONFIG.REPARTOS.map(r => `
-  <button type="button" class="nm-reparto-btn" data-reparto="${r}">${r}</button>
-`).join('');
 const nmRepartoHint = document.getElementById('nm-reparto-hint');
 
-function seleccionarReparto(valor){
-  nmReparto.value = valor;
-  nmRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
-    btn.classList.toggle('selected', btn.dataset.reparto === valor);
-  });
-}
-
-function bloquearRepartoGrid(bloqueado){
-  nmRepartoGrid.classList.toggle('bloqueado', bloqueado);
-  nmRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
-    btn.disabled = bloqueado;
-  });
-}
-
 // Busca el cliente tipeado/elegido en la lista maestra y autocompleta
-// el Reparto con el que tiene asignado en la pestaña Clientes. La
-// grilla queda SIEMPRE bloqueada en este formulario: el Reparto no se
+// el Reparto con el que tiene asignado en la pestaña Clientes. El
+// campo es de solo lectura en este formulario: el Reparto no se
 // elige a mano acá, se edita desde la pestaña Clientes. Si el cliente
 // todavía no tiene Reparto asignado, o el nombre no coincide con
-// ningún cliente cargado, la grilla queda igual bloqueada pero sin
-// ninguna opción seleccionada.
+// ningún cliente cargado, el campo queda vacío.
 function actualizarRepartoSegunCliente(){
   const nombre = nmCliente.value.trim();
   const cli = clientes.find(c => String(c['Cliente']||'').trim().toLowerCase() === nombre.toLowerCase());
   const repartoCliente = cli ? String(cli['Reparto']||'').trim() : '';
 
-  seleccionarReparto(repartoCliente);
-  bloquearRepartoGrid(true);
+  nmReparto.value = repartoCliente;
 
-  if(cli && repartoCliente){
-    nmRepartoHint.textContent = 'Reparto del cliente (fijo). Para cambiarlo, editá el cliente en la pestaña Clientes.';
-  }else if(cli){
+  if(cli && !repartoCliente){
     nmRepartoHint.textContent = 'Este cliente todavía no tiene Reparto asignado. Asignáselo desde la pestaña Clientes.';
   }else{
     nmRepartoHint.textContent = '';
@@ -1164,13 +1167,6 @@ nmFecha.addEventListener('input', actualizarSaldosPreview);
 nmFecha.addEventListener('change', actualizarSaldosPreview);
 [nmImporte, nmEntrego].forEach(inp => inp.addEventListener('input', actualizarSaldosPreview));
 
-nmRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if(btn.disabled) return;
-    seleccionarReparto(nmReparto.value === btn.dataset.reparto ? '' : btn.dataset.reparto);
-  });
-});
-
 // Formateo en vivo de Importe/Entregó: separador de miles, $ adelante.
 function formatearCantidad(valorCrudo){
   const negativo = valorCrudo.trim().startsWith('-');
@@ -1222,11 +1218,21 @@ function abrirNuevoModal(mov, modoEditar){
   btnGuardar.disabled = false;
   btnGuardar.textContent = modoEditar ? 'Guardar cambios' : (precargar ? 'Guardar copia' : 'Guardar');
   nuevoModal.classList.remove('hidden');
+  posicionarNuevoBox(document.querySelector('#nuevo-modal .nuevo-box'));
   document.querySelector('.nuevo-body').scrollTop = 0;
 }
 
 function cerrarNuevoModal(){
   nuevoModal.classList.add('hidden');
+}
+
+// Ubica el formulario (Nuevo/Editar) justo debajo de la barra de
+// búsqueda en vez de pegado abajo de la pantalla, y limita su alto
+// para que no se salga de la pantalla.
+function posicionarNuevoBox(box){
+  const offset = Math.round(searchWrapEl.getBoundingClientRect().bottom) + 10;
+  box.style.marginTop = offset + 'px';
+  box.style.maxHeight = `calc(100vh - ${offset}px - 16px)`;
 }
 
 fabNuevo.addEventListener('click', () => {
@@ -1360,6 +1366,7 @@ function abrirNuevoClienteModal(cliente){
   ncGuardar.disabled = false;
   ncGuardar.textContent = editando ? 'Guardar cambios' : 'Guardar';
   nuevoClienteModal.classList.remove('hidden');
+  posicionarNuevoBox(document.querySelector('#nuevo-cliente-modal .nuevo-box'));
   document.querySelectorAll('#nuevo-cliente-modal .nuevo-body')[0].scrollTop = 0;
 }
 
