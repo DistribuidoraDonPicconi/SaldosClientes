@@ -43,6 +43,7 @@
     }
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
   html,body{
     margin:0; padding:0; height:100%;
     background:var(--fondo);
@@ -116,7 +117,8 @@
     border:1px solid var(--linea); border-radius:14px; overflow:hidden;
     background:#fff; box-shadow:0 1px 2px rgba(22,48,92,0.04);
   }
-  table.clientes{ border-collapse:collapse; width:100%; }
+  .clientes-scroll{ overflow:auto; -webkit-overflow-scrolling:touch; }
+  table.clientes{ border-collapse:collapse; width:100%; min-width:520px; }
   table.clientes td{
     padding:11px 12px; border-bottom:1px solid var(--linea); border-right:1px solid var(--linea);
     vertical-align:middle; text-align:center;
@@ -880,17 +882,19 @@ function renderTablaClientes(lista, seleccionable, mensajeVacio){
 
   mainEl.innerHTML = `
     <div class="stock-table-wrap">
-      <table class="clientes">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th class="nombre">Cliente</th>
-            <th>Reparto</th>
-            <th>Saldo</th>
-          </tr>
-        </thead>
-        <tbody>${filas}${filaTotal}${filasCategoria}</tbody>
-      </table>
+      <div class="clientes-scroll">
+        <table class="clientes">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th class="nombre">Cliente</th>
+              <th>Reparto</th>
+              <th>Saldo</th>
+            </tr>
+          </thead>
+          <tbody>${filas}${filaTotal}${filasCategoria}</tbody>
+        </table>
+      </div>
     </div>`;
 
   if(seleccionable){
@@ -1142,7 +1146,7 @@ async function generarImagenTabla(){
   const wrap = mainEl.querySelector(esMovimientos ? '.mov-table-wrap' : '.stock-table-wrap');
   if(!wrap) throw new Error('No hay tabla para capturar.');
 
-  const ancho = esMovimientos ? 1120 : 480;
+  const ancho = esMovimientos ? 1120 : 560;
   const contenedor = document.createElement('div');
   contenedor.style.cssText = `position:fixed; left:-9999px; top:0; width:${ancho}px; background:#ffffff; padding:22px; font-family:` + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';';
   contenedor.innerHTML = `
@@ -1150,14 +1154,12 @@ async function generarImagenTabla(){
     <div style="font-size:14px;font-weight:700;color:#2a5cc9;margin-bottom:16px;">Distribuidora Don Picconi — ${new Date().toLocaleDateString('es-AR')}</div>
   `;
   const clon = wrap.cloneNode(true);
-  if(esMovimientos){
-    // En Movimientos la tabla vive dentro de un contenedor con scroll
-    // propio (.mov-scroll); para la captura no queremos ese recorte,
-    // así que mostramos la tabla completa.
-    const scroll = clon.querySelector('.mov-scroll') || clon;
-    scroll.style.overflow = 'visible';
-    scroll.style.maxHeight = 'none';
-  }
+  // La tabla vive dentro de un contenedor con scroll propio (.mov-scroll
+  // en Movimientos, .clientes-scroll en Clientes/Alertas); para la
+  // captura no queremos ese recorte, así que mostramos la tabla completa.
+  const scroll = clon.querySelector('.mov-scroll, .clientes-scroll') || clon;
+  scroll.style.overflow = 'visible';
+  scroll.style.maxHeight = 'none';
   contenedor.appendChild(clon);
   document.body.appendChild(contenedor);
 
