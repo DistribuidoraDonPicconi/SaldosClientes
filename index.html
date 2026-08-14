@@ -558,6 +558,7 @@
   <div class="pill-tabs">
     <button id="tab-clientes" data-tab="clientes" class="active">Clientes</button>
     <button id="tab-mov" data-tab="movimientos">Movimientos</button>
+    <button id="tab-alertas" data-tab="alertas">Alertas</button>
   </div>
 
   <div class="search-wrap" id="search-wrap">
@@ -801,30 +802,38 @@ function calcularSaldosClientes(){
     .filter(c => c.nombre);
 }
 
-function renderClientes(filtro){
-  const clientes = calcularSaldosClientes()
-    .filter(c => {
-      if(!filtro) return true;
-      const texto = `${c.nombre} ${c.reparto}`.toLowerCase();
-      return texto.includes(filtro.toLowerCase());
-    })
-    .filter(c => {
-      if(!ocultarSinSaldo) return true;
-      const redondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
-      return redondeado !== 0;
-    })
-    .sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+// Clientes con saldo pendiente (a favor o en contra, cualquier signo
+// distinto de $0) cuyo último movimiento fue hace 7 días o más. Se
+// recalcula siempre a partir de la lista de Clientes, así que apenas
+// se salda la cuenta o se carga un movimiento nuevo, el cliente sale
+// solo de Alertas.
+function calcularClientesEnAlerta(){
+  const haceUnaSemana = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  return calcularSaldosClientes().filter(c => {
+    const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
+    if(saldoRedondeado === 0) return false;
+    if(!c.fecha) return false;
+    const f = new Date(c.fecha);
+    if(isNaN(f)) return false;
+    return f.getTime() <= haceUnaSemana;
+  });
+}
 
-  ultimaListaClientesVisible = clientes;
+// Arma la tabla (mismo formato que se usa en Clientes: fila por
+// cliente + Total + desglose por Reparto) a partir de una lista ya
+// filtrada. `seleccionable` habilita elegir una fila para usar los FAB
+// de Editar/Copiar/Eliminar; en Alertas la tabla es de solo consulta.
+function renderTablaClientes(lista, seleccionable, mensajeVacio){
+  ultimaListaClientesVisible = lista;
 
-  if(!clientes.length){
-    mainEl.innerHTML = `<div class="state-msg">Sin clientes que coincidan.</div>`;
+  if(!lista.length){
+    mainEl.innerHTML = `<div class="state-msg">${mensajeVacio}</div>`;
     return;
   }
 
-  const totalGeneral = clientes.reduce((acc, c) => acc + c.saldo, 0);
+  const totalGeneral = lista.reduce((acc, c) => acc + c.saldo, 0);
 
-  const filas = clientes.map(c => {
+  const filas = lista.map(c => {
     const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
     const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
     return `<tr class="cliente-row" data-cliente="${c.nombre.replace(/"/g,'&quot;')}">
@@ -846,7 +855,7 @@ function renderClientes(filtro){
   // desglose siempre coincide con lo que se está mostrando.
   const porCategoria = {};
   CONFIG.REPARTOS.forEach(r => { porCategoria[r] = 0; });
-  clientes.forEach(c => {
+  lista.forEach(c => {
     const categoria = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
     porCategoria[categoria] = (porCategoria[categoria] || 0) + c.saldo;
   });
@@ -884,14 +893,48 @@ function renderClientes(filtro){
       </table>
     </div>`;
 
-  mainEl.querySelectorAll('tr.cliente-row').forEach(tr => {
-    tr.addEventListener('click', () => {
-      const nombre = tr.dataset.cliente;
-      clienteSeleccionadoNombre = (clienteSeleccionadoNombre === nombre) ? null : nombre;
-      actualizarSeleccionUI();
+  if(seleccionable){
+    mainEl.querySelectorAll('tr.cliente-row').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const nombre = tr.dataset.cliente;
+        clienteSeleccionadoNombre = (clienteSeleccionadoNombre === nombre) ? null : nombre;
+        actualizarSeleccionUI();
+      });
     });
-  });
+  }
   actualizarSeleccionUI();
+}
+
+function renderClientes(filtro){
+  const lista = calcularSaldosClientes()
+    .filter(c => {
+      if(!filtro) return true;
+      const texto = `${c.nombre} ${c.reparto}`.toLowerCase();
+      return texto.includes(filtro.toLowerCase());
+    })
+    .filter(c => {
+      if(!ocultarSinSaldo) return true;
+      const redondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
+      return redondeado !== 0;
+    })
+    .sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+  renderTablaClientes(lista, true, 'Sin clientes que coincidan.');
+}
+
+// Misma tabla que Clientes, pero solo con los que tienen saldo
+// pendiente hace una semana o más. Ordenada por fecha, del más
+// atrasado al más reciente, para que lo más urgente quede arriba.
+function renderAlertas(filtro){
+  const lista = calcularClientesEnAlerta()
+    .filter(c => {
+      if(!filtro) return true;
+      const texto = `${c.nombre} ${c.reparto}`.toLowerCase();
+      return texto.includes(filtro.toLowerCase());
+    })
+    .sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+
+  renderTablaClientes(lista, false, 'No hay clientes con saldo pendiente hace más de una semana.');
 }
 
 /* ============== Pestaña Movimientos ============== */
@@ -968,7 +1011,7 @@ function actualizarListaClientes(){
 }
 
 /* ============== Scroll / tabs ============== */
-const scrollState = { clientes: 0, movimientos: { top: 0, left: 0 } };
+const scrollState = { clientes: 0, alertas: 0, movimientos: { top: 0, left: 0 } };
 let irAlFondoMovimientos = false;
 
 function guardarScrollActual(){
@@ -978,6 +1021,8 @@ function guardarScrollActual(){
       scrollState.movimientos.top = movScroll.scrollTop;
       scrollState.movimientos.left = movScroll.scrollLeft;
     }
+  }else if(currentTab === 'alertas'){
+    scrollState.alertas = mainEl.scrollTop;
   }else{
     scrollState.clientes = mainEl.scrollTop;
   }
@@ -996,6 +1041,8 @@ function restaurarScroll(){
         movScroll.scrollLeft = scrollState.movimientos.left;
       }
     }
+  }else if(currentTab === 'alertas'){
+    mainEl.scrollTop = scrollState.alertas;
   }else{
     mainEl.scrollTop = scrollState.clientes;
   }
@@ -1004,13 +1051,17 @@ function restaurarScroll(){
 function render(){
   const filtro = searchEl.value.trim();
   mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
-  fabNuevo.classList.remove('hidden');
+  fabNuevo.classList.toggle('hidden', currentTab === 'alertas');
   btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
   btnCompartir.classList.remove('hidden');
   if(currentTab === 'clientes'){
     headerTitle.textContent = 'Clientes';
     searchEl.placeholder = 'Buscar cliente...';
     renderClientes(filtro);
+  }else if(currentTab === 'alertas'){
+    headerTitle.textContent = 'Alertas';
+    searchEl.placeholder = 'Buscar cliente...';
+    renderAlertas(filtro);
   }else{
     headerTitle.textContent = 'Movimientos';
     searchEl.placeholder = 'Buscar movimiento...';
@@ -1034,16 +1085,19 @@ function setTab(tab){
   currentTab = tab;
   document.getElementById('tab-clientes').classList.toggle('active', tab === 'clientes');
   document.getElementById('tab-mov').classList.toggle('active', tab === 'movimientos');
+  document.getElementById('tab-alertas').classList.toggle('active', tab === 'alertas');
   deseleccionarFila();
   render();
 }
 
 document.getElementById('tab-clientes').addEventListener('click', () => setTab('clientes'));
 document.getElementById('tab-mov').addEventListener('click', () => setTab('movimientos'));
+document.getElementById('tab-alertas').addEventListener('click', () => setTab('alertas'));
 
 btnRefresh.addEventListener('click', cargarDatos);
 searchEl.addEventListener('input', () => {
   scrollState.clientes = 0;
+  scrollState.alertas = 0;
   scrollState.movimientos = { top: 0, left: 0 };
   render();
 });
@@ -1083,19 +1137,20 @@ async function generarImagenTabla(){
   if(!window.html2canvas){
     throw new Error('No se pudo cargar la librería para generar imágenes. Revisá tu conexión a internet.');
   }
-  const esClientes = currentTab === 'clientes';
-  const wrap = mainEl.querySelector(esClientes ? '.stock-table-wrap' : '.mov-table-wrap');
+  const esMovimientos = currentTab === 'movimientos';
+  const titulo = currentTab === 'clientes' ? 'Clientes' : (currentTab === 'alertas' ? 'Alertas' : 'Movimientos');
+  const wrap = mainEl.querySelector(esMovimientos ? '.mov-table-wrap' : '.stock-table-wrap');
   if(!wrap) throw new Error('No hay tabla para capturar.');
 
-  const ancho = esClientes ? 480 : 1120;
+  const ancho = esMovimientos ? 1120 : 480;
   const contenedor = document.createElement('div');
   contenedor.style.cssText = `position:fixed; left:-9999px; top:0; width:${ancho}px; background:#ffffff; padding:22px; font-family:` + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';';
   contenedor.innerHTML = `
-    <div style="font-size:21px;font-weight:800;color:#111624;letter-spacing:-0.4px;margin-bottom:2px;">${esClientes ? 'Clientes' : 'Movimientos'}</div>
+    <div style="font-size:21px;font-weight:800;color:#111624;letter-spacing:-0.4px;margin-bottom:2px;">${titulo}</div>
     <div style="font-size:14px;font-weight:700;color:#2a5cc9;margin-bottom:16px;">Distribuidora Don Picconi — ${new Date().toLocaleDateString('es-AR')}</div>
   `;
   const clon = wrap.cloneNode(true);
-  if(!esClientes){
+  if(esMovimientos){
     // En Movimientos la tabla vive dentro de un contenedor con scroll
     // propio (.mov-scroll); para la captura no queremos ese recorte,
     // así que mostramos la tabla completa.
@@ -1153,7 +1208,7 @@ btnCompartirWhatsapp.addEventListener('click', async () => {
   // Compartir nativo con imagen adjunta (celular: abre WhatsApp entre las opciones).
   if(navigator.canShare && navigator.canShare({ files: [archivo] })){
     try{
-      await navigator.share({ files: [archivo], title: currentTab === 'clientes' ? 'Saldos de clientes' : 'Movimientos' });
+      await navigator.share({ files: [archivo], title: currentTab === 'clientes' ? 'Saldos de clientes' : (currentTab === 'alertas' ? 'Alertas de saldos' : 'Movimientos') });
       marcarCompartirOk();
       cerrarCompartirModal();
       return;
@@ -1178,7 +1233,9 @@ btnCompartir.addEventListener('click', async () => {
     compartirBlobActual = blob;
     compartirNombreActual = currentTab === 'clientes'
       ? `saldos-clientes-${fechaParaArchivo()}.png`
-      : `movimientos-${fechaParaArchivo()}.png`;
+      : currentTab === 'alertas'
+        ? `alertas-clientes-${fechaParaArchivo()}.png`
+        : `movimientos-${fechaParaArchivo()}.png`;
     compartirUrlActual = URL.createObjectURL(blob);
     compartirPreviewImg.src = compartirUrlActual;
     compartirModal.classList.remove('hidden');
