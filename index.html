@@ -41,6 +41,12 @@
       width:min(1800px, 96vw);
       transform:translateX(-50%);
     }
+    main.ancho-tabla{
+      position:relative;
+      left:50%;
+      width:min(780px, 94vw);
+      transform:translateX(-50%);
+    }
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
@@ -1055,6 +1061,7 @@ function restaurarScroll(){
 function render(){
   const filtro = searchEl.value.trim();
   mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
+  mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes' || currentTab === 'alertas');
   fabNuevo.classList.toggle('hidden', currentTab === 'alertas');
   btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
   btnCompartir.classList.remove('hidden');
