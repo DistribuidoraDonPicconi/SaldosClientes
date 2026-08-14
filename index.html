@@ -269,6 +269,7 @@
     display:flex; flex-direction:column; gap:12px; z-index:50;
   }
   .fab-acciones.hidden{ display:none; }
+  .fab-accion.hidden{ display:none; }
   .fab-accion{
     width:56px; height:56px; border-radius:50%;
     background:var(--azul); color:#fff; border:none;
@@ -711,6 +712,7 @@ async function postAppsScript(payload){
 let movimientos = [];
 let clientes = [];
 let currentTab = 'clientes';
+let miRol = null; // 'admin' o 'colaborador', lo manda el servidor en cada carga
 
 const mainEl = document.getElementById('main');
 const searchEl = document.getElementById('search');
@@ -770,6 +772,8 @@ async function cargarDatos(){
       mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos: ${data.error}</div>`;
       return;
     }
+    miRol = data.rol || null;
+    aplicarPermisosUI();
     movimientos = data.movimientos || [];
     clientes = data.clientes || [];
     actualizarListaClientes();
@@ -1215,8 +1219,16 @@ function actualizarIconosFabAcciones(){
   }
 }
 
+// Un colaborador puede agregar y borrar, pero no editar (ni
+// movimientos ni clientes). El botón "Editar" se oculta para ese rol;
+// el servidor igual rechaza la edición aunque alguien fuerce el botón.
+function aplicarPermisosUI(){
+  fabEditar.classList.toggle('hidden', miRol !== 'admin');
+}
+
 function actualizarSeleccionUI(){
   actualizarIconosFabAcciones();
+  aplicarPermisosUI();
   if(currentTab === 'clientes'){
     let encontrada = false;
     mainEl.querySelectorAll('tr.cliente-row').forEach(tr => {
@@ -1386,6 +1398,37 @@ function abrirNuevoModal(mov, modoEditar){
 
 function cerrarNuevoModal(){
   nuevoModal.classList.add('hidden');
+  liberarLockActivo();
+}
+
+// ============== Lock de edición (avisa si otro usuario ya está
+// editando la misma fila) ==============
+// Antes de abrir el formulario en modo "Editar" pedimos el lock al
+// servidor; si otra persona ya lo tiene, avisamos y no abrimos el
+// formulario. Al cerrar el formulario (cancelar o guardar con éxito)
+// se libera. Si se cierra la pestaña sin avisar, el lock expira solo
+// a los 5 minutos (ver LOCK_TTL_SEGUNDOS en Código.gs).
+let lockIdActivo = null;
+
+async function pedirLock(id){
+  try{
+    const data = await postAppsScript({ accion: 'tomarLock', id });
+    if(data && data.error){
+      alert(data.error);
+      return false;
+    }
+    return true;
+  }catch(err){
+    alert('No se pudo verificar si otra persona está editando esto: ' + err.message);
+    return false;
+  }
+}
+
+function liberarLockActivo(){
+  if(!lockIdActivo) return;
+  const id = lockIdActivo;
+  lockIdActivo = null;
+  postAppsScript({ accion: 'liberarLock', id }).catch(() => {});
 }
 
 // Ubica el formulario (Nuevo/Editar) justo debajo de la barra de
@@ -1404,16 +1447,25 @@ fabNuevo.addEventListener('click', () => {
 document.getElementById('nuevo-cerrar').addEventListener('click', cerrarNuevoModal);
 document.getElementById('nuevo-cancelar-btn').addEventListener('click', cerrarNuevoModal);
 
-fabEditar.addEventListener('click', () => {
+fabEditar.addEventListener('click', async () => {
+  if(miRol !== 'admin') return; // el botón ya está oculto para colaborador; esto es un resguardo extra
   if(currentTab === 'clientes'){
     const nombre = clienteSeleccionadoNombre;
     const cli = clientes.find(c => String(c['Cliente']||'').trim() === nombre);
     deseleccionarFila();
-    if(cli) abrirNuevoClienteModal(cli);
+    if(!cli) return;
+    const idLock = 'cliente_' + String(nombre||'').trim().toLowerCase();
+    if(!(await pedirLock(idLock))) return;
+    lockIdActivo = idLock;
+    abrirNuevoClienteModal(cli);
   }else{
     const mov = movimientos.find(m => String(m['ID']) === String(filaSeleccionadaId));
     deseleccionarFila();
-    if(mov) abrirNuevoModal(mov, true);
+    if(!mov) return;
+    const idLock = String(mov['ID']);
+    if(!(await pedirLock(idLock))) return;
+    lockIdActivo = idLock;
+    abrirNuevoModal(mov, true);
   }
 });
 
@@ -1530,6 +1582,7 @@ function abrirNuevoClienteModal(cliente){
 
 function cerrarNuevoClienteModal(){
   nuevoClienteModal.classList.add('hidden');
+  liberarLockActivo();
 }
 
 document.getElementById('nc-cerrar').addEventListener('click', cerrarNuevoClienteModal);
