@@ -1,6 +1,6 @@
 {
-  "name": "Clientes DP",
-  "short_name": "Clientes DP",
+  "name": "Saldos DP",
+  "short_name": "Saldos DP",
   "description": "Cuenta corriente de clientes - Distribuidora Don Picconi",
   "start_url": "./index.html",
   "display": "standalone",

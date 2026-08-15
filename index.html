@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Clientes DP">
+<meta name="apple-mobile-web-app-title" content="Saldos DP">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-180.png">
 
@@ -744,6 +744,10 @@ const btnCompartir = document.getElementById('btn-compartir');
 
 function formatFecha(valor){
   if(!valor) return '-';
+  if(typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}/.test(valor)){
+    const [y, m, d] = valor.slice(0, 10).split('-');
+    return `${d}/${m}/${y}`;
+  }
   const d = new Date(valor);
   if(isNaN(d)) return String(valor);
   const dd = String(d.getDate()).padStart(2,'0');
