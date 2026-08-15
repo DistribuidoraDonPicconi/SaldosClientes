@@ -742,6 +742,21 @@ const btnRefresh = document.getElementById('btn-refresh');
 const btnOcultarCero = document.getElementById('btn-ocultar-cero');
 const btnCompartir = document.getElementById('btn-compartir');
 
+// Convierte el valor de "Fecha" que viene del servidor a un Date local,
+// sin el corrimiento de huso horario de `new Date("YYYY-MM-DD")` (JS lo
+// interpreta como medianoche UTC). Un movimiento recién guardado en esta
+// misma sesión todavía tiene la fecha como ese string plano (no se volvió
+// a leer de la hoja); uno ya sincronizado viene como fecha completa con
+// hora. Usar siempre esto en vez de `new Date(valor)` sobre un campo Fecha.
+function parsearFechaLocal_(valor){
+  if(valor instanceof Date) return valor;
+  if(typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}/.test(valor)){
+    const [y, m, d] = valor.slice(0, 10).split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(valor);
+}
+
 function formatFecha(valor){
   if(!valor) return '-';
   if(typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}/.test(valor)){
@@ -1615,7 +1630,7 @@ function abrirNuevoModal(mov, modoEditar){
   nmCliente.value = precargar ? (mov['Cliente'] || '') : '';
   actualizarRepartoSegunCliente();
   nmFecha.value = precargar && mov[CONFIG.CAMPO_FECHA]
-    ? fechaLocalInput(new Date(mov[CONFIG.CAMPO_FECHA]))
+    ? fechaLocalInput(parsearFechaLocal_(mov[CONFIG.CAMPO_FECHA]))
     : fechaLocalInput(new Date());
 
   nmImporte.value = (precargar && modoEditar) ? numeroAInputStr(mov['Importe']) : '';
