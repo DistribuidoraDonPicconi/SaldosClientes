@@ -761,6 +761,56 @@ function formatMoneda(n){
   return redondeado < 0 ? `-${str}` : str;
 }
 
+function aplicarCambiosServidor(data){
+  if(!data || !data.ok) return false;
+
+  // Actualiza movimientos por ID, sin volver a descargar toda la hoja.
+  const movActualizados = Array.isArray(data.movimientosActualizados) ? data.movimientosActualizados : [];
+  if(movActualizados.length){
+    const porId = new Map(movActualizados.map(m => [String(m.ID || ''), m]));
+    movimientos = movimientos.map(m => porId.has(String(m.ID || '')) ? porId.get(String(m.ID || '')) : m);
+    const existentes = new Set(movimientos.map(m => String(m.ID || '')));
+    movActualizados.forEach(m => {
+      const id = String(m.ID || '');
+      if(id && !existentes.has(id)) movimientos.push(m);
+    });
+  }
+
+  // Elimina localmente los movimientos borrados.
+  if(Array.isArray(data.movimientosEliminados) && data.movimientosEliminados.length){
+    const eliminados = new Set(data.movimientosEliminados.map(String));
+    movimientos = movimientos.filter(m => !eliminados.has(String(m.ID || '')));
+  }
+
+  // Si un cliente fue renombrado, quitamos primero el nombre viejo.
+  if(data.clienteRenombradoDesde){
+    const viejo = String(data.clienteRenombradoDesde).trim();
+    clientes = clientes.filter(c => String(c.Cliente || '').trim() !== viejo);
+  }
+
+  // Actualiza/agrega clientes modificados.
+  const cliActualizados = Array.isArray(data.clientesActualizados) ? data.clientesActualizados : [];
+  cliActualizados.forEach(cli => {
+    const nombre = String(cli.Cliente || '').trim();
+    const idx = clientes.findIndex(c => String(c.Cliente || '').trim() === nombre);
+    if(idx >= 0) clientes[idx] = cli;
+    else clientes.push(cli);
+  });
+
+  // Si un cliente fue renombrado, el servidor devuelve sus movimientos ya modificados.
+  // Si fue eliminado, lo quitamos de la lista local.
+  if(data.clienteEliminado){
+    const nombreEliminado = String(data.clienteEliminado).trim();
+    clientes = clientes.filter(c => String(c.Cliente || '').trim() !== nombreEliminado);
+    movimientos = movimientos.filter(m => String(m.Cliente || '').trim() !== nombreEliminado);
+  }
+
+  actualizarListaClientes();
+  if(currentTab === 'movimientos') irAlFondoMovimientos = true;
+  render();
+  return true;
+}
+
 async function cargarDatos(){
   btnRefresh.classList.add('spinning');
   try{
@@ -1596,7 +1646,7 @@ document.getElementById('confirm-eliminar-aceptar').addEventListener('click', as
     confirmEliminarModal.classList.add('hidden');
     idAEliminar = null;
     clienteAEliminar = null;
-    await cargarDatos();
+    if(!aplicarCambiosServidor(data)) await cargarDatos();
   }catch(err){
     alert('No se pudo eliminar: ' + err.message);
   }finally{
@@ -1678,7 +1728,7 @@ ncGuardar.addEventListener('click', async () => {
     if(data && data.error) throw new Error(data.error);
 
     cerrarNuevoClienteModal();
-    await cargarDatos();
+    if(!aplicarCambiosServidor(data)) await cargarDatos();
   }catch(err){
     ncError.textContent = 'No se pudo guardar: ' + err.message;
   }finally{
@@ -1723,7 +1773,7 @@ btnGuardar.addEventListener('click', async () => {
     if(data && data.error) throw new Error(data.error);
 
     cerrarNuevoModal();
-    await cargarDatos();
+    if(!aplicarCambiosServidor(data)) await cargarDatos();
   }catch(err){
     nuevoError.textContent = 'No se pudo guardar: ' + err.message;
   }finally{
