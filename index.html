@@ -155,12 +155,23 @@
   table.clientes tr.cliente-row.selected td{ background:var(--azul-suave); }
   table.clientes tr.cliente-row.selected td.nombre{ color:var(--azul-osc); }
 
-  /* Filas de desglose por categoría de reparto, debajo del Total */
+  /* Cabeceras de grupo por Reparto (acordeón contraíble) */
   table.clientes tr.categoria-row td{ background:#f7f9fd; border-top:1px solid var(--linea); }
   table.clientes tr.categoria-row td.nombre{ font-size:13px; font-weight:700; color:var(--texto-tenue); text-transform:uppercase; letter-spacing:0.2px; }
   table.clientes tr.categoria-row td.saldo{ font-size:14.5px; font-weight:700; color:#1a1f2b; }
   table.clientes tr.categoria-row td.saldo.pos{ color:var(--rojo); }
   table.clientes tr.categoria-row td.saldo.zero{ color:#9aa5ba; font-weight:600; }
+  table.clientes tr.categoria-row{ cursor:pointer; user-select:none; }
+  table.clientes tr.categoria-row:active{ background:#eef1f8; }
+  table.clientes tr.categoria-row .caret{
+    display:inline-block; margin-right:6px; font-size:10px; color:var(--texto-tenue);
+    transition:transform .15s ease;
+  }
+  table.clientes tbody.grupo-body.colapsado tr.categoria-row .caret{ transform:rotate(-90deg); }
+  table.clientes tr.categoria-row .grupo-count{
+    font-weight:600; color:#9aa5ba; font-size:12px; text-transform:none; letter-spacing:0;
+  }
+  table.clientes tbody.grupo-body.colapsado tr.cliente-row{ display:none; }
 
 
   /* Tabla Movimientos */
@@ -848,6 +859,10 @@ async function cargarDatos(){
 /* ============== Pestaña Clientes (lista maestra + saldo) ============== */
 let ocultarSinSaldo = false;
 let ultimaListaClientesVisible = [];
+// Categorías de reparto colapsadas en la pestaña Clientes (persiste
+// mientras la app queda abierta; al recargar vuelven a estar todas
+// desplegadas).
+let categoriasColapsadas = new Set();
 
 function calcularSaldosClientes(){
   return clientes
@@ -965,6 +980,98 @@ function renderTablaClientes(lista, seleccionable, mensajeVacio){
   actualizarSeleccionUI();
 }
 
+// Igual que renderTablaClientes, pero agrupa los clientes en
+// solapas contraíbles por Reparto (orden fijo de CONFIG.REPARTOS,
+// "Sin reparto" al final), con los clientes de cada grupo ordenados
+// alfabéticamente. El estado de qué grupos están colapsados vive en
+// categoriasColapsadas y se ignora mientras hay una búsqueda activa,
+// para que los resultados filtrados siempre queden visibles.
+function renderTablaClientesAgrupada(lista, mensajeVacio){
+  ultimaListaClientesVisible = lista;
+
+  if(!lista.length){
+    mainEl.innerHTML = `<div class="state-msg">${mensajeVacio}</div>`;
+    return;
+  }
+
+  const totalGeneral = lista.reduce((acc, c) => acc + c.saldo, 0);
+  const claseTotal = totalGeneral > 0 ? 'pos' : (totalGeneral < 0 ? 'neg' : 'zero');
+  const filaTotal = `<tr class="total-row">
+    <td class="nombre" colspan="3">Total</td>
+    <td class="saldo ${claseTotal}">${formatMoneda(totalGeneral)}</td>
+  </tr>`;
+
+  const grupos = {};
+  lista.forEach(c => {
+    const cat = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
+    (grupos[cat] = grupos[cat] || []).push(c);
+  });
+  const categorias = [...CONFIG.REPARTOS, 'Sin reparto'].filter(cat => grupos[cat] && grupos[cat].length);
+  const hayBusqueda = !!searchEl.value.trim();
+
+  const bloques = categorias.map(cat => {
+    const items = grupos[cat].slice().sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+    const subtotal = items.reduce((acc, c) => acc + c.saldo, 0);
+    const claseSubtotal = subtotal > 0 ? 'pos' : (subtotal < 0 ? 'neg' : 'zero');
+    const colapsado = categoriasColapsadas.has(cat) && !hayBusqueda;
+
+    const filas = items.map(c => {
+      const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
+      const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
+      return `<tr class="cliente-row" data-cliente="${c.nombre.replace(/"/g,'&quot;')}">
+        <td class="fecha">${formatFecha(c.fecha)}</td>
+        <td class="nombre">${c.nombre}</td>
+        <td class="reparto">${c.reparto || '-'}</td>
+        <td class="saldo ${cls}">${formatMoneda(c.saldo)}</td>
+      </tr>`;
+    }).join('');
+
+    return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}" data-grupo="${cat.replace(/"/g,'&quot;')}">
+      <tr class="categoria-row">
+        <td class="nombre" colspan="3"><span class="caret">▾</span>${cat} <span class="grupo-count">(${items.length})</span></td>
+        <td class="saldo ${claseSubtotal}">${formatMoneda(subtotal)}</td>
+      </tr>
+      ${filas}
+    </tbody>`;
+  }).join('');
+
+  mainEl.innerHTML = `
+    <div class="stock-table-wrap">
+      <div class="clientes-scroll">
+        <table class="clientes">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th class="nombre">Cliente</th>
+              <th>Reparto</th>
+              <th>Saldo</th>
+            </tr>
+          </thead>
+          <tbody>${filaTotal}</tbody>
+          ${bloques}
+        </table>
+      </div>
+    </div>`;
+
+  mainEl.querySelectorAll('tr.categoria-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const cat = tr.closest('tbody').dataset.grupo;
+      if(categoriasColapsadas.has(cat)) categoriasColapsadas.delete(cat);
+      else categoriasColapsadas.add(cat);
+      render();
+    });
+  });
+
+  mainEl.querySelectorAll('tr.cliente-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const nombre = tr.dataset.cliente;
+      clienteSeleccionadoNombre = (clienteSeleccionadoNombre === nombre) ? null : nombre;
+      actualizarSeleccionUI();
+    });
+  });
+  actualizarSeleccionUI();
+}
+
 function renderClientes(filtro){
   const lista = calcularSaldosClientes()
     .filter(c => {
@@ -976,10 +1083,9 @@ function renderClientes(filtro){
       if(!ocultarSinSaldo) return true;
       const redondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
       return redondeado !== 0;
-    })
-    .sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+    });
 
-  renderTablaClientes(lista, true, 'Sin clientes que coincidan.');
+  renderTablaClientesAgrupada(lista, 'Sin clientes que coincidan.');
 }
 
 // Misma tabla que Clientes, pero solo con los que tienen saldo
