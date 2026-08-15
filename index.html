@@ -124,7 +124,7 @@
     background:#fff; box-shadow:0 1px 2px rgba(22,48,92,0.04);
   }
   .clientes-scroll{ overflow:auto; -webkit-overflow-scrolling:touch; }
-  table.clientes{ border-collapse:collapse; width:100%; min-width:520px; }
+  table.clientes{ border-collapse:collapse; width:100%; min-width:520px; table-layout:fixed; }
   table.clientes td{
     padding:11px 12px; border-bottom:1px solid var(--linea); border-right:1px solid var(--linea);
     vertical-align:middle; text-align:center;
@@ -955,6 +955,9 @@ function renderTablaClientes(lista, seleccionable, mensajeVacio){
     <div class="stock-table-wrap">
       <div class="clientes-scroll">
         <table class="clientes">
+          <colgroup>
+            <col style="width:88px"><col><col style="width:96px"><col style="width:110px">
+          </colgroup>
           <thead>
             <tr>
               <th>Fecha</th>
@@ -1039,6 +1042,9 @@ function renderTablaClientesAgrupada(lista, mensajeVacio){
     <div class="stock-table-wrap">
       <div class="clientes-scroll">
         <table class="clientes">
+          <colgroup>
+            <col style="width:88px"><col><col style="width:96px"><col style="width:110px">
+          </colgroup>
           <thead>
             <tr>
               <th>Fecha</th>
