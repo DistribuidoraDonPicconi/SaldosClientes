@@ -732,7 +732,7 @@ async function postAppsScript(payload){
 let movimientos = [];
 let clientes = [];
 let currentTab = 'clientes';
-let miRol = null; // 'admin' o 'colaborador', lo manda el servidor en cada carga
+let miRol = null; // 'admin', 'colaborador' o 'visitante', lo manda el servidor en cada carga
 
 const mainEl = document.getElementById('main');
 const searchEl = document.getElementById('search');
@@ -1224,7 +1224,7 @@ function render(){
   const filtro = searchEl.value.trim();
   mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
   mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes' || currentTab === 'alertas');
-  fabNuevo.classList.toggle('hidden', currentTab === 'alertas');
+  fabNuevo.classList.toggle('hidden', miRol === 'visitante' || currentTab === 'alertas');
   btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
   btnCompartir.classList.remove('hidden');
   if(currentTab === 'clientes'){
@@ -1450,8 +1450,14 @@ function actualizarIconosFabAcciones(){
 // Un colaborador puede agregar y borrar, pero no editar (ni
 // movimientos ni clientes). El botón "Editar" se oculta para ese rol;
 // el servidor igual rechaza la edición aunque alguien fuerce el botón.
+// Un visitante es de solo lectura: se le ocultan TODOS los botones de
+// acción (nuevo, copiar, editar, eliminar); el servidor también
+// rechaza cualquier acción para este rol como resguardo extra.
 function aplicarPermisosUI(){
+  const esVisitante = miRol === 'visitante';
   fabEditar.classList.toggle('hidden', miRol !== 'admin');
+  fabNuevo.classList.toggle('hidden', esVisitante || currentTab === 'alertas');
+  if(esVisitante) fabAcciones.classList.add('hidden');
 }
 
 function actualizarSeleccionUI(){
@@ -1465,7 +1471,7 @@ function actualizarSeleccionUI(){
       if(esta) encontrada = true;
     });
     if(clienteSeleccionadoNombre && !encontrada) clienteSeleccionadoNombre = null;
-    fabAcciones.classList.toggle('hidden', !clienteSeleccionadoNombre);
+    fabAcciones.classList.toggle('hidden', miRol === 'visitante' || !clienteSeleccionadoNombre);
   }else{
     let encontrada = false;
     mainEl.querySelectorAll('tr.mov-row').forEach(tr => {
@@ -1474,7 +1480,7 @@ function actualizarSeleccionUI(){
       if(esta) encontrada = true;
     });
     if(filaSeleccionadaId && !encontrada) filaSeleccionadaId = null;
-    fabAcciones.classList.toggle('hidden', !filaSeleccionadaId);
+    fabAcciones.classList.toggle('hidden', miRol === 'visitante' || !filaSeleccionadaId);
   }
 }
 
@@ -1669,6 +1675,7 @@ function posicionarNuevoBox(box){
 }
 
 fabNuevo.addEventListener('click', () => {
+  if(miRol === 'visitante') return; // el botón ya está oculto para visitante; esto es un resguardo extra
   if(currentTab === 'clientes') abrirNuevoClienteModal();
   else abrirNuevoModal();
 });
@@ -1698,6 +1705,7 @@ fabEditar.addEventListener('click', async () => {
 });
 
 fabCopiar.addEventListener('click', () => {
+  if(miRol === 'visitante') return; // el botón ya está oculto para visitante; esto es un resguardo extra
   if(currentTab === 'clientes'){
     const nombre = clienteSeleccionadoNombre;
     deseleccionarFila();
@@ -1720,6 +1728,7 @@ let idAEliminar = null;
 let clienteAEliminar = null;
 
 fabEliminar.addEventListener('click', () => {
+  if(miRol === 'visitante') return; // el botón ya está oculto para visitante; esto es un resguardo extra
   if(currentTab === 'clientes'){
     clienteAEliminar = clienteSeleccionadoNombre;
     deseleccionarFila();
