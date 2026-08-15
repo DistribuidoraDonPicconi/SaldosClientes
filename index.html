@@ -892,10 +892,13 @@ function calcularClientesEnAlerta(){
   });
 }
 
-// Arma la tabla (mismo formato que se usa en Clientes: fila por
-// cliente + Total + desglose por Reparto) a partir de una lista ya
-// filtrada. `seleccionable` habilita elegir una fila para usar los FAB
-// de Editar/Copiar/Eliminar; en Alertas la tabla es de solo consulta.
+// Tabla de solo lectura para Alertas: agrupa por Reparto en solapas
+// contraíbles (mismo mecanismo que Clientes) para identificar rápido,
+// pero sin Total ni subtotales — acá solo importa ubicar rápido al
+// cliente atrasado. Dentro de cada grupo se mantiene el orden por
+// fecha (más atrasado primero) que ya trae `lista`.
+let alertasCategoriasColapsadas = new Set();
+
 function renderTablaClientes(lista, seleccionable, mensajeVacio){
   ultimaListaClientesVisible = lista;
 
@@ -904,51 +907,35 @@ function renderTablaClientes(lista, seleccionable, mensajeVacio){
     return;
   }
 
-  const totalGeneral = lista.reduce((acc, c) => acc + c.saldo, 0);
-
-  const filas = lista.map(c => {
-    const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
-    const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
-    return `<tr class="cliente-row" data-cliente="${c.nombre.replace(/"/g,'&quot;')}">
-      <td class="fecha">${formatFecha(c.fecha)}</td>
-      <td class="nombre">${c.nombre}</td>
-      <td class="reparto">${c.reparto || '-'}</td>
-      <td class="saldo ${cls}">${formatMoneda(c.saldo)}</td>
-    </tr>`;
-  }).join('');
-
-  const claseTotal = totalGeneral > 0 ? 'pos' : (totalGeneral < 0 ? 'neg' : 'zero');
-  const filaTotal = `<tr class="total-row">
-    <td class="nombre" colspan="3">Total</td>
-    <td class="saldo ${claseTotal}">${formatMoneda(totalGeneral)}</td>
-  </tr>`;
-
-  // Desglose por categoría de reparto, debajo del Total. Se calcula
-  // sobre la misma lista que ya está filtrada/visible arriba, así el
-  // desglose siempre coincide con lo que se está mostrando.
-  const porCategoria = {};
-  CONFIG.REPARTOS.forEach(r => { porCategoria[r] = 0; });
+  const grupos = {};
   lista.forEach(c => {
-    const categoria = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
-    porCategoria[categoria] = (porCategoria[categoria] || 0) + c.saldo;
+    const cat = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
+    (grupos[cat] = grupos[cat] || []).push(c);
   });
-  const categorias = Object.keys(porCategoria)
-    .filter(cat => CONFIG.REPARTOS.includes(cat) || porCategoria[cat] !== 0)
-    .sort((a, b) => {
-      const ia = CONFIG.REPARTOS.indexOf(a);
-      const ib = CONFIG.REPARTOS.indexOf(b);
-      if(ia === -1) return 1;
-      if(ib === -1) return -1;
-      return ia - ib;
-    });
-  const filasCategoria = categorias.map(cat => {
-    const saldo = porCategoria[cat];
-    const saldoRedondeado = Math.round((saldo + Number.EPSILON) * 100) / 100;
-    const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
-    return `<tr class="categoria-row">
-      <td class="nombre" colspan="3">${cat}</td>
-      <td class="saldo ${cls}">${formatMoneda(saldo)}</td>
-    </tr>`;
+  const categorias = [...CONFIG.REPARTOS, 'Sin reparto'].filter(cat => grupos[cat] && grupos[cat].length);
+  const hayBusqueda = !!searchEl.value.trim();
+
+  const bloques = categorias.map(cat => {
+    const items = grupos[cat];
+    const colapsado = alertasCategoriasColapsadas.has(cat) && !hayBusqueda;
+
+    const filas = items.map(c => {
+      const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
+      const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
+      return `<tr class="cliente-row" data-cliente="${c.nombre.replace(/"/g,'&quot;')}">
+        <td class="fecha">${formatFecha(c.fecha)}</td>
+        <td class="nombre">${c.nombre}</td>
+        <td class="reparto">${c.reparto || '-'}</td>
+        <td class="saldo ${cls}">${formatMoneda(c.saldo)}</td>
+      </tr>`;
+    }).join('');
+
+    return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}" data-grupo="${cat.replace(/"/g,'&quot;')}">
+      <tr class="categoria-row">
+        <td class="nombre" colspan="4"><span class="caret">▾</span>${cat} <span class="grupo-count">(${items.length})</span></td>
+      </tr>
+      ${filas}
+    </tbody>`;
   }).join('');
 
   mainEl.innerHTML = `
@@ -966,10 +953,19 @@ function renderTablaClientes(lista, seleccionable, mensajeVacio){
               <th>Saldo</th>
             </tr>
           </thead>
-          <tbody>${filas}${filaTotal}${filasCategoria}</tbody>
+          ${bloques}
         </table>
       </div>
     </div>`;
+
+  mainEl.querySelectorAll('tr.categoria-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const cat = tr.closest('tbody').dataset.grupo;
+      if(alertasCategoriasColapsadas.has(cat)) alertasCategoriasColapsadas.delete(cat);
+      else alertasCategoriasColapsadas.add(cat);
+      render();
+    });
+  });
 
   if(seleccionable){
     mainEl.querySelectorAll('tr.cliente-row').forEach(tr => {
