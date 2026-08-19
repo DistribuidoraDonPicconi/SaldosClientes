@@ -841,7 +841,11 @@ async function guardarMovimientoFirestore_(payload){
       'Importe': importe, 'Entregó': entrego,
       'Saldo Anterior': 0, 'Saldo': 0, 'Saldo Acumulado': 0,
       'Usuario': miEmail, 'Notas': notas,
-      'Fecha Real': firebase.firestore.FieldValue.serverTimestamp()
+      'Fecha Real': firebase.firestore.FieldValue.serverTimestamp(),
+      // Se fija una sola vez, acá, y nunca se vuelve a tocar (ni al
+      // editar el movimiento): es lo que define su posición fija en la
+      // lista, equivalente a la posición de una fila en el Sheet viejo.
+      'Orden': firebase.firestore.FieldValue.serverTimestamp()
     });
   }
 
@@ -1002,7 +1006,11 @@ async function cargarDatos(){
   btnRefresh.classList.add('spinning');
   try{
     const [movSnap, cliSnap] = await Promise.all([
-      db.collection('movimientos').get(),
+      // orderBy('Orden'): sin esto, Firestore devuelve los movimientos en
+      // un orden interno arbitrario (no el de carga). "Orden" se fija una
+      // sola vez al crear el movimiento y nunca se toca al editar, así el
+      // orden de la lista queda estable igual que las filas de un Sheet.
+      db.collection('movimientos').orderBy('Orden', 'asc').get(),
       db.collection('clientes').get()
     ]);
     movimientos = movSnap.docs.map(d => Object.assign({}, d.data(), { ID: d.id }));
@@ -1047,7 +1055,7 @@ function calcularClientesEnAlerta(){
     const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
     if(saldoRedondeado === 0) return false;
     if(!c.fecha) return false;
-    const f = new Date(c.fecha);
+    const f = parsearFechaLocal_(c.fecha);
     if(isNaN(f)) return false;
     return f.getTime() <= haceUnaSemana;
   });
@@ -1261,13 +1269,15 @@ function renderAlertas(filtro){
       const texto = `${c.nombre} ${c.reparto}`.toLowerCase();
       return texto.includes(filtro.toLowerCase());
     })
-    .sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+    .sort((a,b) => fechaComparable_(a.fecha) - fechaComparable_(b.fecha));
 
   renderTablaClientes(lista, false, 'No hay clientes con saldo pendiente hace más de una semana.');
 }
 
 /* ============== Pestaña Movimientos ============== */
 function renderMovimientos(filtro){
+  // Ya vienen ordenados por "Orden" desde cargarDatos() (orden de carga,
+  // el más viejo primero); acá no hay que volver a ordenar.
   const ordenados = movimientos;
 
   const filas = ordenados
