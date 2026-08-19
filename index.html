@@ -180,7 +180,7 @@
     background:#fff; box-shadow:0 1px 3px rgba(22,48,92,0.08);
   }
   .mov-scroll{ overflow:auto; -webkit-overflow-scrolling:touch; }
-  table.mov{ border-collapse:separate; border-spacing:0; width:100%; min-width:1120px; }
+  table.mov{ border-collapse:separate; border-spacing:0; width:100%; min-width:1220px; }
   table.mov th{
     position:sticky; top:0; background:#fff; z-index:1;
     text-align:center; font-size:13.5px; color:#1a1f2b; font-weight:800;
@@ -1141,12 +1141,6 @@ function renderAlertas(filtro){
 }
 
 /* ============== Pestaña Movimientos ============== */
-function acortarUsuario_(email){
-  const str = String(email || '').trim();
-  if(!str) return '-';
-  return str.split('@')[0];
-}
-
 function renderMovimientos(filtro){
   const ordenados = movimientos;
 
@@ -1178,7 +1172,7 @@ function renderMovimientos(filtro){
         <td class="num ${clsSaldoAnterior}">${formatMoneda(saldoAnterior)}</td>
         <td class="num ${clsSaldo}">${formatMoneda(saldo)}</td>
         <td class="num ${clsSaldoAcum}">${formatMoneda(saldoAcum)}</td>
-        <td class="usuario" title="${mov['Usuario'] || ''}">${acortarUsuario_(mov['Usuario'])}</td>
+        <td class="usuario">${mov['Usuario'] || '-'}</td>
       </tr>`;
     }).join('');
 
