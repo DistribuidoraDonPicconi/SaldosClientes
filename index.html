@@ -344,6 +344,12 @@
   }
   .nuevo-body input:focus{ border-color:var(--azul); }
   .nuevo-body input[readonly]{ background:#f4f7fc; color:var(--texto-tenue); }
+  .nuevo-body textarea{
+    width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--azul-borde);
+    background:#fff; font-size:16px; outline:none; color:#1a1f2b; font-family:inherit;
+    resize:vertical; text-align:left;
+  }
+  .nuevo-body textarea:focus{ border-color:var(--azul); }
 
   .nm-reparto-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .nm-reparto-btn{
@@ -489,6 +495,9 @@
       </div>
       <datalist id="lista-clientes"></datalist>
 
+      <label for="nm-email">Cargado por</label>
+      <input type="text" id="nm-email" readonly>
+
       <div class="nuevo-importes-grid nm-saldos-grid">
         <div>
           <label for="nm-reparto">Reparto</label>
@@ -516,6 +525,9 @@
           <input type="text" id="nm-saldo-acumulado" readonly>
         </div>
       </div>
+
+      <label for="nm-notas">Notas</label>
+      <textarea id="nm-notas" rows="2" placeholder="Notas (opcional)"></textarea>
     </div>
     <div class="nuevo-error" id="nuevo-error"></div>
     <div class="nuevo-footer">
@@ -681,6 +693,7 @@ function manejarCredencial(response){
     return;
   }
   guardarSesion(response.credential, payload);
+  miEmail = payload.email || null;
   ocultarLogin();
   cargarDatos();
 }
@@ -701,6 +714,7 @@ function iniciarLogin(){
 
   const sesion = sesionGuardada();
   if(sesion){
+    miEmail = sesion.email || null;
     ocultarLogin();
     cargarDatos();
   }else{
@@ -733,6 +747,7 @@ let movimientos = [];
 let clientes = [];
 let currentTab = 'clientes';
 let miRol = null; // 'admin', 'colaborador' o 'visitante', lo manda el servidor en cada carga
+let miEmail = null; // email de Google de quien está logueado, para el campo "Cargado por"
 
 const mainEl = document.getElementById('main');
 const searchEl = document.getElementById('search');
@@ -1462,15 +1477,17 @@ function actualizarIconosFabAcciones(){
   }
 }
 
-// Un colaborador puede agregar y borrar, pero no editar (ni
-// movimientos ni clientes). El botón "Editar" se oculta para ese rol;
-// el servidor igual rechaza la edición aunque alguien fuerce el botón.
+// Un colaborador puede agregar, pero no editar ni eliminar (ni
+// movimientos ni clientes). Los botones "Editar" y "Eliminar" se
+// ocultan para ese rol; el servidor igual rechaza esas acciones aunque
+// alguien fuerce el botón.
 // Un visitante es de solo lectura: se le ocultan TODOS los botones de
 // acción (nuevo, copiar, editar, eliminar); el servidor también
 // rechaza cualquier acción para este rol como resguardo extra.
 function aplicarPermisosUI(){
   const esVisitante = miRol === 'visitante';
   fabEditar.classList.toggle('hidden', miRol !== 'admin');
+  fabEliminar.classList.toggle('hidden', miRol !== 'admin');
   fabNuevo.classList.toggle('hidden', esVisitante || currentTab === 'alertas');
   if(esVisitante) fabAcciones.classList.add('hidden');
 }
@@ -1513,6 +1530,8 @@ const nmCliente = document.getElementById('nm-cliente');
 const nmFecha = document.getElementById('nm-fecha');
 const nmImporte = document.getElementById('nm-importe');
 const nmEntrego = document.getElementById('nm-entrego');
+const nmEmail = document.getElementById('nm-email');
+const nmNotas = document.getElementById('nm-notas');
 const nuevoError = document.getElementById('nuevo-error');
 const btnGuardar = document.getElementById('nuevo-guardar');
 const nmSaldoAnterior = document.getElementById('nm-saldo-anterior');
@@ -1637,6 +1656,12 @@ function abrirNuevoModal(mov, modoEditar){
   nmEntrego.value = (precargar && modoEditar) ? numeroAInputStr(mov['Entregó']) : '';
   actualizarSaldosPreview();
 
+  // El email queda bloqueado con el de quien está logueado ahora. Al
+  // editar un movimiento existente, se conserva el email de quien lo
+  // cargó originalmente en vez de pisarlo con el del editor.
+  nmEmail.value = (precargar && modoEditar && mov['Email']) ? mov['Email'] : (miEmail || '');
+  nmNotas.value = precargar ? (mov['Notas'] || '') : '';
+
   nuevoError.textContent = '';
   btnGuardar.disabled = false;
   btnGuardar.textContent = modoEditar ? 'Guardar cambios' : (precargar ? 'Guardar copia' : 'Guardar');
@@ -1743,7 +1768,7 @@ let idAEliminar = null;
 let clienteAEliminar = null;
 
 fabEliminar.addEventListener('click', () => {
-  if(miRol === 'visitante') return; // el botón ya está oculto para visitante; esto es un resguardo extra
+  if(miRol !== 'admin') return; // el botón ya está oculto para colaborador/visitante; esto es un resguardo extra
   if(currentTab === 'clientes'){
     clienteAEliminar = clienteSeleccionadoNombre;
     deseleccionarFila();
@@ -1897,7 +1922,8 @@ btnGuardar.addEventListener('click', async () => {
     cliente, reparto,
     fecha: nmFecha.value,
     importe: limpiarCantidadParaEnvio(nmImporte.value.trim() || '0'),
-    entrego: limpiarCantidadParaEnvio(nmEntrego.value.trim() || '0')
+    entrego: limpiarCantidadParaEnvio(nmEntrego.value.trim() || '0'),
+    notas: nmNotas.value.trim()
   };
   if(nmEditId.value) payload.id = nmEditId.value;
 
