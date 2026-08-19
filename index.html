@@ -18,8 +18,13 @@
 <!-- Genera imágenes (para el botón "Compartir" de las pestañas Clientes y Movimientos) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-<!-- Login con Google -->
+<!-- Login con Google (botón / credencial) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- Firebase (Auth + Firestore) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 
 <style>
   :root{
@@ -606,97 +611,78 @@
 <script>
 /* ============== CONFIGURACIÓN ============== */
 const CONFIG = {
-  // Pegá acá la URL de tu Web App de Apps Script (termina en /exec)
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxM4o52xS_sd04ZPLw-6muHybZogHy0vH5xCoiICTFIUMrt4iZj0YNQz4CzGBJDh3vI5Q/exec',
+  // Pegá acá la config de tu proyecto Firebase (Configuración del
+  // proyecto > Tus apps > SDK de Firebase > Configuración).
+  firebaseConfig: {
+    apiKey: 'AIzaSyDdA6avj0jx2389byaF7_JL5Ae3IkbhCkE',
+    authDomain: 'app-saldos-769fd.firebaseapp.com',
+    projectId: 'app-saldos-769fd',
+    storageBucket: 'app-saldos-769fd.firebasestorage.app',
+    messagingSenderId: '1084049770580',
+    appId: '1:1084049770580:web:575881c786c4f4525945c1'
+  },
 
-  // Pegá acá el mismo Client ID que pusiste en Código.gs (Google Cloud
-  // Console > Credenciales > ID de cliente de OAuth 2.0 > Aplicación web)
+  // Mismo Client ID que ya tenías (Google Cloud Console > Credenciales >
+  // ID de cliente de OAuth 2.0 > Aplicación web). Se sigue usando para
+  // mostrar el botón de Google; quien valida la sesión ahora es Firebase Auth.
   GOOGLE_CLIENT_ID: '922655936984-eb35rn1hu1855l6b4939qvvl286h7l10.apps.googleusercontent.com',
+
+  // Roles solo para decidir qué botones mostrar en la interfaz. La
+  // seguridad real (quién puede leer/escribir qué) la aplica
+  // firestore.rules del lado del servidor con esta misma lista; si
+  // agregás o sacás a alguien, actualizá los DOS lugares.
+  ROLES: {
+    'nicolaspicconi@gmail.com': 'admin',
+    'distribuidoradonpicconi@gmail.com': 'colaborador',
+    'jj978536@gmail.com': 'visitante',
+    'grandoliosergio109@gmail.com': 'visitante'
+  },
 
   CAMPO_FECHA: 'Fecha',
   REPARTOS: ['Granja', 'Reparto 1', 'Reparto 2', 'Reparto 3']
 };
 /* ============================================= */
 
-/* ============== LOGIN CON GOOGLE ============== */
-const LOGIN_STORAGE_KEY = 'dp_clientes_login';
+/* ============== FIREBASE ============== */
+firebase.initializeApp(CONFIG.firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const LOCK_TTL_MS = 5 * 60 * 1000; // 5 minutos, igual que antes
+/* ======================================== */
 
+/* ============== LOGIN CON GOOGLE (vía Firebase Auth) ============== */
 const loginScreen = document.getElementById('login-screen');
 const loginChecking = document.getElementById('login-checking');
 const googleBtnContainer = document.getElementById('google-btn-container');
 const loginError = document.getElementById('login-error');
 const btnLogout = document.getElementById('btn-logout');
 
-function decodeJwt_(token){
-  try{
-    const base64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
-    const json = decodeURIComponent(atob(base64).split('').map(c =>
-      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-    ).join(''));
-    return JSON.parse(json);
-  }catch(err){
-    return null;
-  }
-}
-
-function sesionGuardada(){
-  try{
-    const raw = localStorage.getItem(LOGIN_STORAGE_KEY);
-    if(!raw) return null;
-    const datos = JSON.parse(raw);
-    if(!datos.token || !datos.exp) return null;
-    // exp viene en segundos (formato JWT); le restamos un margen de 60s.
-    if(Date.now() / 1000 > datos.exp - 60) return null;
-    return datos;
-  }catch(err){
-    return null;
-  }
-}
-
-function guardarSesion(token, payload){
-  localStorage.setItem(LOGIN_STORAGE_KEY, JSON.stringify({
-    token: token,
-    email: payload.email,
-    exp: payload.exp
-  }));
-}
-
-function cerrarSesion(){
-  localStorage.removeItem(LOGIN_STORAGE_KEY);
-  if(window.google && google.accounts && google.accounts.id){
-    google.accounts.id.disableAutoSelect();
-  }
-  mostrarLogin();
-}
-
-function tokenActual(){
-  const sesion = sesionGuardada();
-  return sesion ? sesion.token : null;
-}
-
 function mostrarLogin(){
   document.getElementById('app').style.display = 'none';
   loginScreen.classList.remove('hidden');
   loginChecking.style.display = 'none';
   googleBtnContainer.style.display = 'block';
-  loginError.textContent = '';
 }
 
 function ocultarLogin(){
   loginScreen.classList.add('hidden');
   document.getElementById('app').style.display = '';
+  loginError.textContent = '';
 }
 
+// El botón de Google nos da un idToken; se lo pasamos a Firebase Auth
+// para que abra (o reabra) la sesión. La sesión persiste sola entre
+// visitas (Firebase se encarga), no hace falta guardar nada a mano.
 function manejarCredencial(response){
-  const payload = decodeJwt_(response.credential);
-  if(!payload){
-    loginError.textContent = 'No se pudo leer la respuesta de Google.';
-    return;
-  }
-  guardarSesion(response.credential, payload);
-  miEmail = payload.email || null;
-  ocultarLogin();
-  cargarDatos();
+  loginError.textContent = '';
+  loginChecking.style.display = 'block';
+  googleBtnContainer.style.display = 'none';
+  const credencial = firebase.auth.GoogleAuthProvider.credential(response.credential);
+  auth.signInWithCredential(credencial).catch(err => {
+    loginChecking.style.display = 'none';
+    googleBtnContainer.style.display = 'block';
+    loginError.textContent = 'No se pudo iniciar sesión: ' + err.message;
+  });
 }
 
 function iniciarLogin(){
@@ -712,37 +698,237 @@ function iniciarLogin(){
   google.accounts.id.renderButton(googleBtnContainer, {
     type: 'standard', size: 'large', theme: 'filled_blue', text: 'signin_with', shape: 'pill'
   });
-
-  const sesion = sesionGuardada();
-  if(sesion){
-    miEmail = sesion.email || null;
-    ocultarLogin();
-    cargarDatos();
-  }else{
-    mostrarLogin();
-  }
 }
 
+// Única fuente de verdad de la sesión: Firebase Auth. Cuando cambia
+// (login, logout, o al recargar la página con sesión ya persistida),
+// buscamos el rol del usuario en la colección "roles" de Firestore.
+auth.onAuthStateChanged(async (user) => {
+  if(!user){
+    miEmail = null;
+    miRol = null;
+    mostrarLogin();
+    return;
+  }
+  loginChecking.style.display = 'block';
+  googleBtnContainer.style.display = 'none';
+  miEmail = String(user.email || '').trim().toLowerCase();
+  const rol = CONFIG.ROLES[miEmail];
+  if(!rol){
+    loginError.textContent = 'Tu cuenta (' + miEmail + ') no tiene acceso a esta app.';
+    await auth.signOut();
+    return;
+  }
+  miRol = rol;
+  try{
+    aplicarPermisosUI();
+    ocultarLogin();
+    await cargarDatos();
+  }catch(err){
+    loginError.textContent = 'No se pudo cargar la app: ' + err.message;
+    await auth.signOut();
+  }
+});
+
 btnLogout.addEventListener('click', () => {
-  if(confirm('¿Cerrar sesión?')) cerrarSesion();
+  if(confirm('¿Cerrar sesión?')) auth.signOut();
 });
 /* ================================================ */
 
-// Helper: manda un POST al Apps Script agregando el token de sesión.
-// Si el backend responde que la sesión no es válida, cierra sesión sola.
-async function postAppsScript(payload){
-  const token = tokenActual();
-  if(!token){ cerrarSesion(); throw new Error('Sesión vencida. Iniciá sesión de nuevo.'); }
-  const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
-    method: 'POST',
-    body: JSON.stringify(Object.assign({}, payload, { token }))
-  });
-  const data = await resp.json();
-  if(data && data.error && /no autenticado|sesión inválida|no tiene acceso|no autorizado/i.test(data.error)){
-    cerrarSesion();
-  }
-  return data;
+// Nombre de columna a slug, usado como ID de documento en la colección
+// "clientes" (así renombrar un cliente es predecible y buscarlo por
+// nombre no requiere una query extra).
+function slugCliente_(nombre){
+  return String(nombre || '').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'cliente';
 }
+
+// Devuelve un timestamp comparable para ordenar por fecha (los
+// movimientos guardan "Fecha" como string plano "YYYY-MM-DD", sin
+// corrimiento de huso horario).
+function fechaComparable_(valor){
+  if(typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}/.test(valor)){
+    const [y, m, d] = valor.slice(0, 10).split('-').map(Number);
+    return new Date(y, m - 1, d).getTime();
+  }
+  return new Date(valor).getTime();
+}
+
+// Recalcula Saldo Anterior / Saldo / Saldo Acumulado de todos los
+// movimientos de los clientes indicados, y el resumen (Fecha Último
+// Movimiento / Saldo Acumulado) de cada uno. Equivalente en el cliente
+// a lo que antes hacía recalcularTodo_ en el servidor.
+async function recalcularClientes_(nombres){
+  const nombresUnicos = [...new Set((nombres || []).map(n => String(n || '').trim()).filter(Boolean))];
+  if(!nombresUnicos.length) return;
+
+  const batch = db.batch();
+  let hayEscrituras = false;
+
+  for(const nombre of nombresUnicos){
+    const snap = await db.collection('movimientos').where('Cliente', '==', nombre).get();
+    const filas = snap.docs
+      .map(d => ({ ref: d.ref, datos: d.data() }))
+      .sort((a, b) => fechaComparable_(a.datos['Fecha']) - fechaComparable_(b.datos['Fecha']));
+
+    let saldoAnterior = 0;
+    let ultimaFecha = '';
+    filas.forEach(f => {
+      const importe = parseFloat(f.datos['Importe']) || 0;
+      const entrego = parseFloat(f.datos['Entregó']) || 0;
+      const saldo = importe - entrego;
+      const saldoAcumulado = saldoAnterior + saldo;
+
+      if(f.datos['Saldo Anterior'] !== saldoAnterior || f.datos['Saldo'] !== saldo || f.datos['Saldo Acumulado'] !== saldoAcumulado){
+        batch.update(f.ref, {
+          'Saldo Anterior': saldoAnterior,
+          'Saldo': saldo,
+          'Saldo Acumulado': saldoAcumulado
+        });
+        hayEscrituras = true;
+      }
+      saldoAnterior = saldoAcumulado;
+      ultimaFecha = f.datos['Fecha'] || '';
+    });
+
+    batch.set(db.collection('clientes').doc(slugCliente_(nombre)), {
+      'Fecha Último Movimiento': ultimaFecha,
+      'Saldo Acumulado': saldoAnterior
+    }, { merge: true });
+    hayEscrituras = true;
+  }
+
+  if(hayEscrituras) await batch.commit();
+}
+
+// ============== Movimientos: guardar / eliminar ==============
+async function guardarMovimientoFirestore_(payload){
+  const cliente = String(payload.cliente || '').trim();
+  const reparto = String(payload.reparto || '').trim();
+  const fecha = payload.fecha;
+  const importe = parseFloat(payload.importe) || 0;
+  const entrego = parseFloat(payload.entrego) || 0;
+  const notas = String(payload.notas || '').trim();
+
+  if(!cliente) throw new Error('Falta el cliente');
+  if(!fecha) throw new Error('Falta la fecha');
+  const existeCliente = clientes.some(c => String(c['Cliente'] || '').trim().toLowerCase() === cliente.toLowerCase());
+  if(!existeCliente){
+    throw new Error('El cliente "' + cliente + '" no está cargado en la lista de Clientes. Agregalo primero desde esa pestaña.');
+  }
+
+  let clienteAnterior = null;
+
+  if(payload.id){
+    if(miRol !== 'admin') throw new Error('Tu usuario no tiene permiso para editar un movimiento. Solo un administrador puede hacerlo.');
+    const ref = db.collection('movimientos').doc(String(payload.id));
+    const snap = await ref.get();
+    if(!snap.exists) throw new Error('No se encontró el movimiento a editar');
+    clienteAnterior = String(snap.data()['Cliente'] || '').trim();
+    await ref.update({
+      'Fecha': fecha, 'Cliente': cliente, 'Reparto': reparto,
+      'Importe': importe, 'Entregó': entrego, 'Notas': notas,
+      // 'Usuario' NO se toca: se conserva el de quien cargó el movimiento
+      // originalmente, no el de quien lo está editando ahora.
+      'Fecha Real': firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }else{
+    const ref = db.collection('movimientos').doc();
+    await ref.set({
+      'ID': ref.id, 'Fecha': fecha, 'Cliente': cliente, 'Reparto': reparto,
+      'Importe': importe, 'Entregó': entrego,
+      'Saldo Anterior': 0, 'Saldo': 0, 'Saldo Acumulado': 0,
+      'Usuario': miEmail, 'Notas': notas,
+      'Fecha Real': firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  const aRecalcular = [cliente];
+  if(clienteAnterior && clienteAnterior !== cliente) aRecalcular.push(clienteAnterior);
+  await recalcularClientes_(aRecalcular);
+  await cargarDatos();
+}
+
+async function eliminarMovimientoFirestore_(id){
+  if(miRol !== 'admin') throw new Error('Tu usuario no tiene permiso para eliminar un movimiento. Solo un administrador puede hacerlo.');
+  const ref = db.collection('movimientos').doc(String(id));
+  const snap = await ref.get();
+  if(!snap.exists) throw new Error('No se encontró el movimiento a eliminar');
+  const cliente = String(snap.data()['Cliente'] || '').trim();
+  await ref.delete();
+  await recalcularClientes_([cliente]);
+  await cargarDatos();
+}
+/* =============================================================== */
+
+// ============== Clientes: guardar / eliminar ==============
+async function guardarClienteFirestore_(nombreNuevoIn, repartoIn, nombreOriginalIn){
+  const nombreNuevo = String(nombreNuevoIn || '').trim();
+  const reparto = String(repartoIn || '').trim();
+  const nombreOriginal = String(nombreOriginalIn || '').trim();
+  if(!nombreNuevo) throw new Error('Falta el nombre del cliente');
+  if(nombreOriginal && miRol !== 'admin'){
+    throw new Error('Tu usuario no tiene permiso para editar un cliente. Solo un administrador puede hacerlo.');
+  }
+
+  const slugNuevo = slugCliente_(nombreNuevo);
+  const refNuevo = db.collection('clientes').doc(slugNuevo);
+
+  if(nombreOriginal){
+    const slugOriginal = slugCliente_(nombreOriginal);
+    const refOriginal = db.collection('clientes').doc(slugOriginal);
+    const snapOriginal = await refOriginal.get();
+    if(!snapOriginal.exists) throw new Error('No se encontró el cliente a editar');
+
+    if(slugOriginal === slugNuevo){
+      await refOriginal.update({ 'Cliente': nombreNuevo, 'Reparto': reparto });
+    }else{
+      const yaExiste = await refNuevo.get();
+      if(yaExiste.exists) throw new Error('Ya existe otro cliente con ese nombre');
+      const datosPrevios = snapOriginal.data();
+      await refNuevo.set({
+        'Cliente': nombreNuevo, 'Reparto': reparto,
+        'Fecha Último Movimiento': datosPrevios['Fecha Último Movimiento'] || '',
+        'Saldo Acumulado': datosPrevios['Saldo Acumulado'] || 0
+      });
+      await refOriginal.delete();
+
+      // Renombrado en cascada: todos los movimientos de este cliente
+      // pasan a apuntar al nombre nuevo, para no perder el vínculo.
+      const snapMov = await db.collection('movimientos').where('Cliente', '==', nombreOriginal).get();
+      if(!snapMov.empty){
+        const batch = db.batch();
+        snapMov.forEach(d => batch.update(d.ref, { 'Cliente': nombreNuevo }));
+        await batch.commit();
+      }
+    }
+  }else{
+    const yaExiste = await refNuevo.get();
+    if(yaExiste.exists) throw new Error('Ya existe un cliente con ese nombre');
+    await refNuevo.set({
+      'Cliente': nombreNuevo, 'Reparto': reparto,
+      'Fecha Último Movimiento': '', 'Saldo Acumulado': 0
+    });
+  }
+
+  await cargarDatos();
+}
+
+async function eliminarClienteFirestore_(nombreIn){
+  const nombre = String(nombreIn || '').trim();
+  if(!nombre) throw new Error('Falta el cliente a eliminar');
+  if(miRol !== 'admin') throw new Error('Tu usuario no tiene permiso para eliminar un cliente. Solo un administrador puede hacerlo.');
+
+  const snapMov = await db.collection('movimientos').where('Cliente', '==', nombre).limit(1).get();
+  if(!snapMov.empty){
+    throw new Error('No se puede eliminar: el cliente tiene movimientos cargados. Eliminá primero sus movimientos.');
+  }
+  await db.collection('clientes').doc(slugCliente_(nombre)).delete();
+  await cargarDatos();
+}
+/* =============================================================== */
 
 let movimientos = [];
 let clientes = [];
@@ -807,85 +993,25 @@ function formatMoneda(n){
   return redondeado < 0 ? `-${str}` : str;
 }
 
-function aplicarCambiosServidor(data){
-  if(!data || !data.ok) return false;
-
-  // Actualiza movimientos por ID, sin volver a descargar toda la hoja.
-  const movActualizados = Array.isArray(data.movimientosActualizados) ? data.movimientosActualizados : [];
-  if(movActualizados.length){
-    const porId = new Map(movActualizados.map(m => [String(m.ID || ''), m]));
-    movimientos = movimientos.map(m => porId.has(String(m.ID || '')) ? porId.get(String(m.ID || '')) : m);
-    const existentes = new Set(movimientos.map(m => String(m.ID || '')));
-    movActualizados.forEach(m => {
-      const id = String(m.ID || '');
-      if(id && !existentes.has(id)) movimientos.push(m);
-    });
-  }
-
-  // Elimina localmente los movimientos borrados.
-  if(Array.isArray(data.movimientosEliminados) && data.movimientosEliminados.length){
-    const eliminados = new Set(data.movimientosEliminados.map(String));
-    movimientos = movimientos.filter(m => !eliminados.has(String(m.ID || '')));
-  }
-
-  // Si un cliente fue renombrado, quitamos primero el nombre viejo.
-  if(data.clienteRenombradoDesde){
-    const viejo = String(data.clienteRenombradoDesde).trim();
-    clientes = clientes.filter(c => String(c.Cliente || '').trim() !== viejo);
-  }
-
-  // Actualiza/agrega clientes modificados.
-  const cliActualizados = Array.isArray(data.clientesActualizados) ? data.clientesActualizados : [];
-  cliActualizados.forEach(cli => {
-    const nombre = String(cli.Cliente || '').trim();
-    const idx = clientes.findIndex(c => String(c.Cliente || '').trim() === nombre);
-    if(idx >= 0) clientes[idx] = cli;
-    else clientes.push(cli);
-  });
-
-  // Si un cliente fue renombrado, el servidor devuelve sus movimientos ya modificados.
-  // Si fue eliminado, lo quitamos de la lista local.
-  if(data.clienteEliminado){
-    const nombreEliminado = String(data.clienteEliminado).trim();
-    clientes = clientes.filter(c => String(c.Cliente || '').trim() !== nombreEliminado);
-    movimientos = movimientos.filter(m => String(m.Cliente || '').trim() !== nombreEliminado);
-  }
-
-  actualizarListaClientes();
-  if(currentTab === 'movimientos') irAlFondoMovimientos = true;
-  render();
-  return true;
-}
-
+// Trae todo de Firestore de nuevo y vuelve a renderizar. Al no depender
+// de un delta calculado por el servidor, cada acción (guardar, eliminar,
+// etc.) simplemente llama esto al final: siempre queda consistente con
+// lo que hay en la base, al costo de un par de lecturas extra (gratis
+// hasta un volumen alto en el plan Spark).
 async function cargarDatos(){
   btnRefresh.classList.add('spinning');
   try{
-    const token = tokenActual();
-    if(!token){ cerrarSesion(); return; }
-    const url = CONFIG.APPS_SCRIPT_URL + '?token=' + encodeURIComponent(token);
-    const resp = await fetch(url, {cache:'no-store'});
-    if(!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    if(data && data.error){
-      if(/no autenticado|sesión inválida|no tiene acceso|no autorizado/i.test(data.error)){
-        cerrarSesion();
-        loginError.textContent = data.error;
-        return;
-      }
-      movimientos = [];
-      clientes = [];
-      mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos: ${data.error}</div>`;
-      return;
-    }
-    miRol = data.rol || null;
-    aplicarPermisosUI();
-    movimientos = data.movimientos || [];
-    clientes = data.clientes || [];
+    const [movSnap, cliSnap] = await Promise.all([
+      db.collection('movimientos').get(),
+      db.collection('clientes').get()
+    ]);
+    movimientos = movSnap.docs.map(d => Object.assign({}, d.data(), { ID: d.id }));
+    clientes = cliSnap.docs.map(d => Object.assign({}, d.data(), { _id: d.id }));
     actualizarListaClientes();
     if(currentTab === 'movimientos') irAlFondoMovimientos = true;
     render();
   }catch(err){
-    mainEl.innerHTML = `<div class="state-msg error">No se pudo cargar el Google Sheet.<br>${err.message}<br><br>Revisá que CONFIG.APPS_SCRIPT_URL esté bien configurada.</div>`;
+    mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos de Firebase.<br>${err.message}</div>`;
   }finally{
     btnRefresh.classList.remove('spinning');
   }
@@ -1688,15 +1814,30 @@ function cerrarNuevoModal(){
 let lockIdActivo = null;
 
 async function pedirLock(id){
+  const ref = db.collection('locks').doc(id);
   try{
-    const data = await postAppsScript({ accion: 'tomarLock', id });
-    if(data && data.error){
-      alert(data.error);
-      return false;
-    }
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const ahora = Date.now();
+      if(snap.exists){
+        const datos = snap.data();
+        const expiraMs = datos.expira && datos.expira.toMillis ? datos.expira.toMillis() : 0;
+        if(datos.email !== miEmail && expiraMs > ahora){
+          const minutosRestantes = Math.max(1, Math.ceil((expiraMs - ahora) / 60000));
+          throw new Error('Esto lo está editando ahora ' + datos.email + '. Probá de nuevo en unos minutos (o pedile que termine y cierre el formulario).');
+        }
+      }
+      tx.set(ref, {
+        email: miEmail,
+        desde: firebase.firestore.FieldValue.serverTimestamp(),
+        expira: firebase.firestore.Timestamp.fromMillis(ahora + LOCK_TTL_MS)
+      });
+    });
     return true;
   }catch(err){
-    alert('No se pudo verificar si otra persona está editando esto: ' + err.message);
+    alert(err.message && err.message.includes('editando ahora')
+      ? err.message
+      : ('No se pudo verificar si otra persona está editando esto: ' + err.message));
     return false;
   }
 }
@@ -1705,7 +1846,10 @@ function liberarLockActivo(){
   if(!lockIdActivo) return;
   const id = lockIdActivo;
   lockIdActivo = null;
-  postAppsScript({ accion: 'liberarLock', id }).catch(() => {});
+  const ref = db.collection('locks').doc(id);
+  ref.get().then(snap => {
+    if(snap.exists && snap.data().email === miEmail) return ref.delete();
+  }).catch(() => {});
 }
 
 // Ubica el formulario (Nuevo/Editar) justo debajo de la barra de
@@ -1732,7 +1876,7 @@ fabEditar.addEventListener('click', async () => {
     const cli = clientes.find(c => String(c['Cliente']||'').trim() === nombre);
     deseleccionarFila();
     if(!cli) return;
-    const idLock = 'cliente_' + String(nombre||'').trim().toLowerCase();
+    const idLock = 'cliente_' + slugCliente_(nombre);
     if(!(await pedirLock(idLock))) return;
     lockIdActivo = idLock;
     abrirNuevoClienteModal(cli);
@@ -1797,20 +1941,16 @@ document.getElementById('confirm-eliminar-cancelar').addEventListener('click', (
 
 document.getElementById('confirm-eliminar-aceptar').addEventListener('click', async () => {
   if(!idAEliminar && !clienteAEliminar) return;
-  const payload = clienteAEliminar
-    ? { accion: 'eliminarCliente', cliente: clienteAEliminar }
-    : { accion: 'eliminar', id: idAEliminar };
   const btnAceptar = document.getElementById('confirm-eliminar-aceptar');
   btnAceptar.disabled = true;
   btnAceptar.textContent = 'Eliminando...';
   try{
-    const data = await postAppsScript(payload);
-    if(data && data.error) throw new Error(data.error);
+    if(clienteAEliminar) await eliminarClienteFirestore_(clienteAEliminar);
+    else await eliminarMovimientoFirestore_(idAEliminar);
 
     confirmEliminarModal.classList.add('hidden');
     idAEliminar = null;
     clienteAEliminar = null;
-    if(!aplicarCambiosServidor(data)) await cargarDatos();
   }catch(err){
     alert('No se pudo eliminar: ' + err.message);
   }finally{
@@ -1877,22 +2017,12 @@ ncGuardar.addEventListener('click', async () => {
     return;
   }
 
-  const payload = {
-    accion: 'guardarCliente',
-    cliente: nombre,
-    reparto: ncReparto.value.trim()
-  };
-  if(ncNombreOriginal.value) payload.nombreOriginal = ncNombreOriginal.value;
-
   ncGuardar.disabled = true;
   ncGuardar.textContent = 'Guardando...';
 
   try{
-    const data = await postAppsScript(payload);
-    if(data && data.error) throw new Error(data.error);
-
+    await guardarClienteFirestore_(nombre, ncReparto.value.trim(), ncNombreOriginal.value);
     cerrarNuevoClienteModal();
-    if(!aplicarCambiosServidor(data)) await cargarDatos();
   }catch(err){
     ncError.textContent = 'No se pudo guardar: ' + err.message;
   }finally{
@@ -1934,11 +2064,8 @@ btnGuardar.addEventListener('click', async () => {
   btnGuardar.textContent = 'Guardando...';
 
   try{
-    const data = await postAppsScript(payload);
-    if(data && data.error) throw new Error(data.error);
-
+    await guardarMovimientoFirestore_(payload);
     cerrarNuevoModal();
-    if(!aplicarCambiosServidor(data)) await cargarDatos();
   }catch(err){
     nuevoError.textContent = 'No se pudo guardar: ' + err.message;
   }finally{
