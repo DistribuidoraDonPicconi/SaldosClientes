@@ -1429,7 +1429,10 @@ function setTab(tab){
   document.getElementById('tab-alertas').classList.toggle('active', tab === 'alertas');
   deseleccionarFila();
   render();
-  cargarDatos(); // sincroniza como si se apretara el botón Actualizar de esta pestaña
+  // Solo sincronizamos automático al entrar a Clientes, como si se apretara
+  // el botón Actualizar. En Movimientos y Alertas se usa el dato ya cargado
+  // (hay que tocar el botón de sincronizar a mano si hace falta refrescar).
+  if(tab === 'clientes') cargarDatos();
 }
 
 document.getElementById('tab-clientes').addEventListener('click', () => setTab('clientes'));
