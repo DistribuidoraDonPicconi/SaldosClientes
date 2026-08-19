@@ -495,9 +495,6 @@
       </div>
       <datalist id="lista-clientes"></datalist>
 
-      <label for="nm-email">Cargado por</label>
-      <input type="text" id="nm-email" readonly>
-
       <div class="nuevo-importes-grid nm-saldos-grid">
         <div>
           <label for="nm-reparto">Reparto</label>
@@ -528,6 +525,9 @@
 
       <label for="nm-notas">Notas</label>
       <textarea id="nm-notas" rows="2" placeholder="Notas (opcional)"></textarea>
+
+      <label for="nm-email">Usuario</label>
+      <input type="text" id="nm-email" readonly>
     </div>
     <div class="nuevo-error" id="nuevo-error"></div>
     <div class="nuevo-footer">
@@ -1291,6 +1291,7 @@ function setTab(tab){
   document.getElementById('tab-alertas').classList.toggle('active', tab === 'alertas');
   deseleccionarFila();
   render();
+  cargarDatos(); // sincroniza como si se apretara el botón Actualizar de esta pestaña
 }
 
 document.getElementById('tab-clientes').addEventListener('click', () => setTab('clientes'));
@@ -1656,10 +1657,10 @@ function abrirNuevoModal(mov, modoEditar){
   nmEntrego.value = (precargar && modoEditar) ? numeroAInputStr(mov['Entregó']) : '';
   actualizarSaldosPreview();
 
-  // El email queda bloqueado con el de quien está logueado ahora. Al
-  // editar un movimiento existente, se conserva el email de quien lo
-  // cargó originalmente en vez de pisarlo con el del editor.
-  nmEmail.value = (precargar && modoEditar && mov['Email']) ? mov['Email'] : (miEmail || '');
+  // El usuario queda bloqueado con el email de quien está logueado
+  // ahora. Al editar un movimiento existente, se conserva el usuario
+  // que lo cargó originalmente en vez de pisarlo con el del editor.
+  nmEmail.value = (precargar && modoEditar && mov['Usuario']) ? mov['Usuario'] : (miEmail || '');
   nmNotas.value = precargar ? (mov['Notas'] || '') : '';
 
   nuevoError.textContent = '';
