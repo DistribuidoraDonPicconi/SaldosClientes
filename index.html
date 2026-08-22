@@ -213,14 +213,14 @@
   table.mov tbody tr.mov-row.selected td{ background:var(--azul-suave); }
   table.mov tbody tr.mov-row.selected td.fecha{ color:var(--azul-osc); }
 
-  /* Modal de confirmación (eliminar) */
-  #confirm-eliminar-modal{
+  /* Modal de confirmación (eliminar / cerrar sesión) */
+  #confirm-eliminar-modal, #confirm-logout-modal{
     position:fixed; inset:0; z-index:200;
     background:rgba(17,22,36,0.55);
     display:flex; align-items:center; justify-content:center;
     padding:24px;
   }
-  #confirm-eliminar-modal.hidden{ display:none; }
+  #confirm-eliminar-modal.hidden, #confirm-logout-modal.hidden{ display:none; }
   .confirm-box{
     width:100%; max-width:320px;
     background:#fff; border-radius:18px;
@@ -440,6 +440,20 @@
     <div class="confirm-actions">
       <button class="btn-cancelar" id="confirm-eliminar-cancelar">Cancelar</button>
       <button class="btn-confirmar" id="confirm-eliminar-aceptar">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirm-logout-modal" class="hidden">
+  <div class="confirm-box">
+    <div class="confirm-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </div>
+    <h3>Cerrar sesión</h3>
+    <p>¿Seguro que querés cerrar sesión?</p>
+    <div class="confirm-actions">
+      <button class="btn-cancelar" id="confirm-logout-cancelar">Cancelar</button>
+      <button class="btn-confirmar" id="confirm-logout-aceptar">Confirmar</button>
     </div>
   </div>
 </div>
@@ -731,7 +745,14 @@ auth.onAuthStateChanged(async (user) => {
 });
 
 btnLogout.addEventListener('click', () => {
-  if(confirm('¿Cerrar sesión?')) auth.signOut();
+  document.getElementById('confirm-logout-modal').classList.remove('hidden');
+});
+document.getElementById('confirm-logout-cancelar').addEventListener('click', () => {
+  document.getElementById('confirm-logout-modal').classList.add('hidden');
+});
+document.getElementById('confirm-logout-aceptar').addEventListener('click', () => {
+  document.getElementById('confirm-logout-modal').classList.add('hidden');
+  auth.signOut();
 });
 /* ================================================ */
 
