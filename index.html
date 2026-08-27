@@ -201,11 +201,6 @@
   }
   table.mov td:last-child{ border-right:none; }
   table.mov td.fecha{ color:var(--azul); font-weight:700; }
-  table.mov td.orden{ width:34px; padding:0 4px; text-align:center; }
-  .orden-btns{ display:flex; flex-direction:column; gap:2px; }
-  .orden-btn{ border:1px solid #dfe4ee; background:#fff; border-radius:5px; width:22px; height:18px; line-height:1; font-size:11px; color:var(--azul); cursor:pointer; padding:0; }
-  .orden-btn:disabled{ visibility:hidden; }
-  .orden-btn:active:not(:disabled){ background:var(--azul-suave); }
   table.mov td.cliente{ font-weight:700; }
   table.mov td.usuario{ font-size:12.5px; color:var(--texto-tenue); font-weight:600; }
   table.mov td.num{ text-align:center; font-weight:700; }
@@ -782,25 +777,12 @@ function fechaComparable_(valor){
   return new Date(valor).getTime();
 }
 
-// Timestamp de "Orden" (momento en que se creó el movimiento). Se fija
-// una sola vez al crear y nunca se toca al editar; sirve para
-// desempatar movimientos de la misma fecha, y se puede reasignar entre
-// dos movimientos (ver moverMovimiento_) para corregir el orden cuando
-// no coincide con el orden real de los hechos.
-function ordenComparable_(datos){
-  const o = datos['Orden'];
-  if(o && typeof o.toMillis === 'function') return o.toMillis();
-  if(o && typeof o.seconds === 'number') return o.seconds * 1000;
+// Devuelve un número comparable a partir del campo "Orden" (Timestamp
+// de Firestore), para desempatar movimientos con la misma Fecha en el
+// mismo orden en que se muestran en la pestaña Movimientos.
+function ordenComparable_(valor){
+  if(valor && typeof valor.toMillis === 'function') return valor.toMillis();
   return 0;
-}
-
-// Orden final a usar en toda la app: Fecha primero, y Orden (momento de
-// creación) como desempate entre movimientos del mismo día.
-function compararMovimientos_(a, b){
-  const fa = fechaComparable_(a['Fecha']);
-  const fb = fechaComparable_(b['Fecha']);
-  if(fa !== fb) return fa - fb;
-  return ordenComparable_(a) - ordenComparable_(b);
 }
 
 // Recalcula Saldo Anterior / Saldo / Saldo Acumulado de todos los
@@ -818,7 +800,14 @@ async function recalcularClientes_(nombres){
     const snap = await db.collection('movimientos').where('Cliente', '==', nombre).get();
     const filas = snap.docs
       .map(d => ({ ref: d.ref, datos: d.data() }))
-      .sort((a, b) => compararMovimientos_(a.datos, b.datos));
+      .sort((a, b) => {
+        const difFecha = fechaComparable_(a.datos['Fecha']) - fechaComparable_(b.datos['Fecha']);
+        if(difFecha !== 0) return difFecha;
+        // Misma fecha: desempata por "Orden", igual que en la pestaña
+        // Movimientos, para que el saldo calculado coincida con lo que
+        // se ve en pantalla.
+        return ordenComparable_(a.datos['Orden']) - ordenComparable_(b.datos['Orden']);
+      });
 
     let saldoAnterior = 0;
     let ultimaFecha = '';
@@ -874,13 +863,29 @@ async function guardarMovimientoFirestore_(payload){
     const snap = await ref.get();
     if(!snap.exists) throw new Error('No se encontró el movimiento a editar');
     clienteAnterior = String(snap.data()['Cliente'] || '').trim();
-    await ref.update({
+
+    const actualizacion = {
       'Fecha': fecha, 'Cliente': cliente, 'Reparto': reparto,
       'Importe': importe, 'Entregó': entrego, 'Notas': notas,
       // 'Usuario' NO se toca: se conserva el de quien cargó el movimiento
       // originalmente, no el de quien lo está editando ahora.
       'Fecha Real': firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
+
+    // Si queda otro movimiento del mismo cliente con la misma fecha,
+    // este pasa al final de ese grupo de fecha (nunca más allá: "Orden"
+    // solo desempata dentro de la misma Fecha, así que sigue quedando
+    // antes que cualquier movimiento de una fecha posterior).
+    const hayOtroMismaFecha = movimientos.some(m =>
+      String(m['ID'] || '') !== String(payload.id) &&
+      String(m['Cliente'] || '').trim() === cliente &&
+      String(m['Fecha'] || '').slice(0, 10) === String(fecha).slice(0, 10)
+    );
+    if(hayOtroMismaFecha){
+      actualizacion['Orden'] = firebase.firestore.FieldValue.serverTimestamp();
+    }
+
+    await ref.update(actualizacion);
   }else{
     const ref = db.collection('movimientos').doc();
     await ref.set({
@@ -909,28 +914,6 @@ async function eliminarMovimientoFirestore_(id){
   if(!snap.exists) throw new Error('No se encontró el movimiento a eliminar');
   const cliente = String(snap.data()['Cliente'] || '').trim();
   await ref.delete();
-  await recalcularClientes_([cliente]);
-  await cargarDatos();
-}
-
-// Intercambia el "Orden" entre dos movimientos del mismo cliente y
-// misma fecha, para corregir el orden mostrado y la cadena de saldos
-// cuando no coincide con el orden real de los hechos (sin exponer
-// ningún concepto de hora al usuario). Dispara el mismo recálculo
-// automático que usa cualquier alta/edición/baja.
-async function moverMovimiento_(idA, idB){
-  if(miRol !== 'admin') throw new Error('Tu usuario no tiene permiso para reordenar movimientos. Solo un administrador puede hacerlo.');
-  const refA = db.collection('movimientos').doc(String(idA));
-  const refB = db.collection('movimientos').doc(String(idB));
-  const [snapA, snapB] = await Promise.all([refA.get(), refB.get()]);
-  if(!snapA.exists || !snapB.exists) throw new Error('No se encontró alguno de los movimientos a reordenar');
-  const ordenA = snapA.data()['Orden'];
-  const ordenB = snapB.data()['Orden'];
-  const cliente = String(snapA.data()['Cliente'] || '').trim();
-  const batch = db.batch();
-  batch.update(refA, { 'Orden': ordenB });
-  batch.update(refB, { 'Orden': ordenA });
-  await batch.commit();
   await recalcularClientes_([cliente]);
   await cargarDatos();
 }
@@ -1344,25 +1327,10 @@ function renderAlertas(filtro){
 }
 
 /* ============== Pestaña Movimientos ============== */
-// Devuelve el movimiento anterior/siguiente del mismo cliente y misma
-// fecha (según "Orden"), para habilitar las flechas de reordenar solo
-// cuando hay algo con qué intercambiar.
-function vecinosMismoDia_(mov, todos){
-  const grupo = todos
-    .filter(m => m['Cliente'] === mov['Cliente'] && m['Fecha'] === mov['Fecha'])
-    .sort((a, b) => ordenComparable_(a) - ordenComparable_(b));
-  const idx = grupo.findIndex(m => m['ID'] === mov['ID']);
-  return {
-    anterior: idx > 0 ? grupo[idx - 1] : null,
-    siguiente: idx > -1 && idx < grupo.length - 1 ? grupo[idx + 1] : null
-  };
-}
-
 function renderMovimientos(filtro){
-  // Se reordenan por Fecha (con "Orden" de creación como desempate),
-  // igual que en recalcularClientes_, para que la tabla coincida con la
-  // cadena de saldos calculada.
-  const ordenados = movimientos.slice().sort(compararMovimientos_);
+  // Ya vienen ordenados por "Orden" desde cargarDatos() (orden de carga,
+  // el más viejo primero); acá no hay que volver a ordenar.
+  const ordenados = movimientos;
 
   const filas = ordenados
     .filter(mov => {
@@ -1383,19 +1351,7 @@ function renderMovimientos(filtro){
       const clsSaldo = saldo > 0 ? 'neg' : (saldo < 0 ? 'pos' : 'zero');
       const clsSaldoAcum = saldoAcum > 0 ? 'neg' : (saldoAcum < 0 ? 'pos' : 'zero');
 
-      let celdaOrden = '';
-      if(miRol === 'admin'){
-        const { anterior, siguiente } = vecinosMismoDia_(mov, ordenados);
-        celdaOrden = `<td class="orden" onclick="event.stopPropagation()">
-          <div class="orden-btns">
-            <button class="orden-btn" data-mover="arriba" data-id="${mov['ID']||''}" data-vecino="${anterior ? anterior['ID'] : ''}" ${anterior ? '' : 'disabled'} title="Mover antes">▲</button>
-            <button class="orden-btn" data-mover="abajo" data-id="${mov['ID']||''}" data-vecino="${siguiente ? siguiente['ID'] : ''}" ${siguiente ? '' : 'disabled'} title="Mover después">▼</button>
-          </div>
-        </td>`;
-      }
-
       return `<tr class="mov-row" data-id="${mov['ID'] || ''}">
-        ${celdaOrden}
         <td class="fecha">${formatFecha(mov[CONFIG.CAMPO_FECHA])}</td>
         <td class="cliente">${mov['Cliente'] || '-'}</td>
         <td>${mov['Reparto'] || '-'}</td>
@@ -1419,7 +1375,6 @@ function renderMovimientos(filtro){
         <table class="mov">
           <thead>
             <tr>
-              ${miRol === 'admin' ? '<th></th>' : ''}
               <th>Fecha</th><th>Cliente</th><th>Reparto</th>
               <th>Importe</th><th>Entregó</th>
               <th>Saldo Anterior</th><th>Saldo</th><th>Saldo Acumulado</th><th>Usuario</th>
@@ -1435,19 +1390,6 @@ function renderMovimientos(filtro){
       const id = tr.dataset.id;
       filaSeleccionadaId = (filaSeleccionadaId === id) ? null : id;
       actualizarSeleccionUI();
-    });
-  });
-  mainEl.querySelectorAll('.orden-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const vecino = btn.dataset.vecino;
-      if(!id || !vecino) return;
-      btn.disabled = true;
-      try{
-        await moverMovimiento_(id, vecino);
-      }catch(err){
-        alert(err.message || 'No se pudo reordenar el movimiento.');
-      }
     });
   });
   actualizarSeleccionUI();
