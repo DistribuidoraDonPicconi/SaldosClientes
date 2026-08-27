@@ -185,7 +185,7 @@
     background:#fff; box-shadow:0 1px 3px rgba(22,48,92,0.08);
   }
   .mov-scroll{ overflow:auto; -webkit-overflow-scrolling:touch; }
-  table.mov{ border-collapse:separate; border-spacing:0; width:100%; min-width:1220px; }
+  table.mov{ border-collapse:separate; border-spacing:0; width:100%; min-width:1420px; }
   table.mov th{
     position:sticky; top:0; background:#fff; z-index:1;
     text-align:center; font-size:13.5px; color:#1a1f2b; font-weight:800;
@@ -203,6 +203,7 @@
   table.mov td.fecha{ color:var(--azul); font-weight:700; }
   table.mov td.cliente{ font-weight:700; }
   table.mov td.usuario{ font-size:12.5px; color:var(--texto-tenue); font-weight:600; }
+  table.mov td.notas{ font-size:12.5px; color:var(--texto-tenue); max-width:220px; white-space:normal; word-break:break-word; }
   table.mov td.num{ text-align:center; font-weight:700; }
   table.mov td.num.pos{ color:var(--verde); }
   table.mov td.num.neg{ color:var(--rojo); }
@@ -1360,6 +1361,7 @@ function renderMovimientos(filtro){
         <td class="num ${clsSaldoAnterior}">${formatMoneda(saldoAnterior)}</td>
         <td class="num ${clsSaldo}">${formatMoneda(saldo)}</td>
         <td class="num ${clsSaldoAcum}">${formatMoneda(saldoAcum)}</td>
+        <td class="notas">${mov['Notas'] || '-'}</td>
         <td class="usuario">${mov['Usuario'] || '-'}</td>
       </tr>`;
     }).join('');
@@ -1377,7 +1379,7 @@ function renderMovimientos(filtro){
             <tr>
               <th>Fecha</th><th>Cliente</th><th>Reparto</th>
               <th>Importe</th><th>Entregó</th>
-              <th>Saldo Anterior</th><th>Saldo</th><th>Saldo Acumulado</th><th>Usuario</th>
+              <th>Saldo Anterior</th><th>Saldo</th><th>Saldo Acumulado</th><th>Notas</th><th>Usuario</th>
             </tr>
           </thead>
           <tbody>${filas}</tbody>
