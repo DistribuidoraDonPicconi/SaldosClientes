@@ -372,10 +372,10 @@
 
   .nuevo-importes-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .nuevo-importes-grid > div:nth-child(3){ grid-column:1 / -1; }
-  .nm-fecha-cliente-grid{ display:grid; grid-template-columns:1fr 1.3fr; gap:10px; }
+  .nm-fecha-cliente-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .nm-fecha-cliente-grid label{ margin-top:0; }
 
-  .nm-saldos-grid{ grid-template-columns:1fr 1fr; gap:8px; margin-top:24px; }
+  .nm-saldos-grid{ grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
   .nm-saldos-grid label{ text-align:center; }
   .nm-saldos-grid input[readonly]{
     text-align:center; font-weight:800; font-size:14.5px; padding:11px 10px;
@@ -388,6 +388,7 @@
   #nuevo-modal .nuevo-body input[type="text"],
   #nuevo-modal .nuevo-body input[type="date"]{ text-align:center; }
   #nuevo-modal .nm-reparto-hint{ text-align:center; }
+  label[for="nm-notas"], label[for="nm-email"]{ margin-top:24px; }
 
   .nuevo-hint{ font-size:12.5px; color:var(--texto-tenue); margin-top:6px; line-height:1.4; }
 
