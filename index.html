@@ -522,17 +522,17 @@
           <input type="text" id="nm-reparto" readonly>
         </div>
         <div>
-          <label for="nm-importe">Importe</label>
-          <input type="text" inputmode="decimal" id="nm-importe" placeholder="$0">
+          <label for="nm-saldo-anterior">Saldo anterior</label>
+          <input type="text" id="nm-saldo-anterior" readonly>
         </div>
         <div class="nm-reparto-hint" id="nm-reparto-hint"></div>
         <div>
-          <label for="nm-entrego">Entregó</label>
-          <input type="text" inputmode="decimal" id="nm-entrego" placeholder="$0">
+          <label for="nm-importe">Importe</label>
+          <input type="text" inputmode="decimal" id="nm-importe" placeholder="$0">
         </div>
         <div>
-          <label for="nm-saldo-anterior">Saldo anterior</label>
-          <input type="text" id="nm-saldo-anterior" readonly>
+          <label for="nm-entrego">Entregó</label>
+          <input type="text" inputmode="decimal" id="nm-entrego" placeholder="$0">
         </div>
         <div>
           <label for="nm-saldo">Saldo</label>
@@ -610,7 +610,6 @@
   <div class="pill-tabs">
     <button id="tab-clientes" data-tab="clientes" class="active">Clientes</button>
     <button id="tab-mov" data-tab="movimientos">Movimientos</button>
-    <button id="tab-alertas" data-tab="alertas">Alertas</button>
   </div>
 
   <div class="search-wrap" id="search-wrap">
@@ -1097,111 +1096,7 @@ function calcularSaldosClientes(){
     .filter(c => c.nombre);
 }
 
-// Clientes con saldo pendiente (a favor o en contra, cualquier signo
-// distinto de $0) cuyo último movimiento fue hace 7 días o más. Se
-// recalcula siempre a partir de la lista de Clientes, así que apenas
-// se salda la cuenta o se carga un movimiento nuevo, el cliente sale
-// solo de Alertas.
-function calcularClientesEnAlerta(){
-  const haceUnaSemana = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  return calcularSaldosClientes().filter(c => {
-    const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
-    if(saldoRedondeado === 0) return false;
-    if(!c.fecha) return false;
-    const f = parsearFechaLocal_(c.fecha);
-    if(isNaN(f)) return false;
-    return f.getTime() <= haceUnaSemana;
-  });
-}
-
-// Tabla de solo lectura para Alertas: agrupa por Reparto en solapas
-// contraíbles (mismo mecanismo que Clientes) para identificar rápido,
-// pero sin Total ni subtotales — acá solo importa ubicar rápido al
-// cliente atrasado. Dentro de cada grupo se mantiene el orden por
-// fecha (más atrasado primero) que ya trae `lista`.
-let alertasCategoriasColapsadas = new Set();
-
-function renderTablaClientes(lista, seleccionable, mensajeVacio){
-  ultimaListaClientesVisible = lista;
-
-  if(!lista.length){
-    mainEl.innerHTML = `<div class="state-msg">${mensajeVacio}</div>`;
-    return;
-  }
-
-  const grupos = {};
-  lista.forEach(c => {
-    const cat = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
-    (grupos[cat] = grupos[cat] || []).push(c);
-  });
-  const categorias = [...CONFIG.REPARTOS, 'Sin reparto'].filter(cat => grupos[cat] && grupos[cat].length);
-  const hayBusqueda = !!searchEl.value.trim();
-
-  const bloques = categorias.map(cat => {
-    const items = grupos[cat];
-    const colapsado = alertasCategoriasColapsadas.has(cat) && !hayBusqueda;
-
-    const filas = items.map(c => {
-      const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
-      const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
-      return `<tr class="cliente-row" data-cliente="${c.nombre.replace(/"/g,'&quot;')}">
-        <td class="fecha">${formatFecha(c.fecha)}</td>
-        <td class="nombre">${c.nombre}</td>
-        <td class="reparto">${c.reparto || '-'}</td>
-        <td class="saldo ${cls}">${formatMoneda(c.saldo)}</td>
-      </tr>`;
-    }).join('');
-
-    return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}" data-grupo="${cat.replace(/"/g,'&quot;')}">
-      <tr class="categoria-row">
-        <td class="nombre" colspan="4"><span class="caret">▾</span>${cat} <span class="grupo-count">(${items.length})</span></td>
-      </tr>
-      ${filas}
-    </tbody>`;
-  }).join('');
-
-  mainEl.innerHTML = `
-    <div class="stock-table-wrap">
-      <div class="clientes-scroll">
-        <table class="clientes">
-          <colgroup>
-            <col style="width:88px"><col><col style="width:96px"><col style="width:110px">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th class="nombre">Cliente</th>
-              <th>Reparto</th>
-              <th>Saldo</th>
-            </tr>
-          </thead>
-          ${bloques}
-        </table>
-      </div>
-    </div>`;
-
-  mainEl.querySelectorAll('tr.categoria-row').forEach(tr => {
-    tr.addEventListener('click', () => {
-      const cat = tr.closest('tbody').dataset.grupo;
-      if(alertasCategoriasColapsadas.has(cat)) alertasCategoriasColapsadas.delete(cat);
-      else alertasCategoriasColapsadas.add(cat);
-      render();
-    });
-  });
-
-  if(seleccionable){
-    mainEl.querySelectorAll('tr.cliente-row').forEach(tr => {
-      tr.addEventListener('click', () => {
-        const nombre = tr.dataset.cliente;
-        clienteSeleccionadoNombre = (clienteSeleccionadoNombre === nombre) ? null : nombre;
-        actualizarSeleccionUI();
-      });
-    });
-  }
-  actualizarSeleccionUI();
-}
-
-// Igual que renderTablaClientes, pero agrupa los clientes en
+// Agrupa los clientes en
 // solapas contraíbles por Reparto (orden fijo de CONFIG.REPARTOS,
 // "Sin reparto" al final), con los clientes de cada grupo ordenados
 // alfabéticamente. El estado de qué grupos están colapsados vive en
@@ -1231,7 +1126,9 @@ function renderTablaClientesAgrupada(lista, mensajeVacio){
   const hayBusqueda = !!searchEl.value.trim();
 
   const bloques = categorias.map(cat => {
-    const items = grupos[cat].slice().sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+    const items = grupos[cat].slice().sort((a,b) =>
+      fechaComparable_(a.fecha) - fechaComparable_(b.fecha) || a.nombre.localeCompare(b.nombre, 'es')
+    );
     const subtotal = items.reduce((acc, c) => acc + c.saldo, 0);
     const claseSubtotal = subtotal > 0 ? 'pos' : (subtotal < 0 ? 'neg' : 'zero');
     const colapsado = categoriasColapsadas.has(cat) && !hayBusqueda;
@@ -1312,21 +1209,6 @@ function renderClientes(filtro){
   renderTablaClientesAgrupada(lista, 'Sin clientes que coincidan.');
 }
 
-// Misma tabla que Clientes, pero solo con los que tienen saldo
-// pendiente hace una semana o más. Ordenada por fecha, del más
-// atrasado al más reciente, para que lo más urgente quede arriba.
-function renderAlertas(filtro){
-  const lista = calcularClientesEnAlerta()
-    .filter(c => {
-      if(!filtro) return true;
-      const texto = `${c.nombre} ${c.reparto}`.toLowerCase();
-      return texto.includes(filtro.toLowerCase());
-    })
-    .sort((a,b) => fechaComparable_(a.fecha) - fechaComparable_(b.fecha));
-
-  renderTablaClientes(lista, false, 'No hay clientes con saldo pendiente hace más de una semana.');
-}
-
 /* ============== Pestaña Movimientos ============== */
 function renderMovimientos(filtro){
   // Ya vienen ordenados por "Orden" desde cargarDatos() (orden de carga,
@@ -1356,9 +1238,9 @@ function renderMovimientos(filtro){
         <td class="fecha">${formatFecha(mov[CONFIG.CAMPO_FECHA])}</td>
         <td class="cliente">${mov['Cliente'] || '-'}</td>
         <td>${mov['Reparto'] || '-'}</td>
+        <td class="num ${clsSaldoAnterior}">${formatMoneda(saldoAnterior)}</td>
         ${celdaImporte}
         ${celdaEntrego}
-        <td class="num ${clsSaldoAnterior}">${formatMoneda(saldoAnterior)}</td>
         <td class="num ${clsSaldo}">${formatMoneda(saldo)}</td>
         <td class="num ${clsSaldoAcum}">${formatMoneda(saldoAcum)}</td>
         <td class="notas">${mov['Notas'] || '-'}</td>
@@ -1378,8 +1260,9 @@ function renderMovimientos(filtro){
           <thead>
             <tr>
               <th>Fecha</th><th>Cliente</th><th>Reparto</th>
+              <th>Saldo Anterior</th>
               <th>Importe</th><th>Entregó</th>
-              <th>Saldo Anterior</th><th>Saldo</th><th>Saldo Acumulado</th><th>Notas</th><th>Usuario</th>
+              <th>Saldo</th><th>Saldo Acumulado</th><th>Notas</th><th>Usuario</th>
             </tr>
           </thead>
           <tbody>${filas}</tbody>
@@ -1405,7 +1288,7 @@ function actualizarListaClientes(){
 }
 
 /* ============== Scroll / tabs ============== */
-const scrollState = { clientes: 0, alertas: 0, movimientos: { top: 0, left: 0 } };
+const scrollState = { clientes: 0, movimientos: { top: 0, left: 0 } };
 let irAlFondoMovimientos = false;
 
 function guardarScrollActual(){
@@ -1415,8 +1298,6 @@ function guardarScrollActual(){
       scrollState.movimientos.top = movScroll.scrollTop;
       scrollState.movimientos.left = movScroll.scrollLeft;
     }
-  }else if(currentTab === 'alertas'){
-    scrollState.alertas = mainEl.scrollTop;
   }else{
     scrollState.clientes = mainEl.scrollTop;
   }
@@ -1435,8 +1316,6 @@ function restaurarScroll(){
         movScroll.scrollLeft = scrollState.movimientos.left;
       }
     }
-  }else if(currentTab === 'alertas'){
-    mainEl.scrollTop = scrollState.alertas;
   }else{
     mainEl.scrollTop = scrollState.clientes;
   }
@@ -1445,18 +1324,14 @@ function restaurarScroll(){
 function render(){
   const filtro = searchEl.value.trim();
   mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
-  mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes' || currentTab === 'alertas');
-  fabNuevo.classList.toggle('hidden', miRol === 'visitante' || currentTab === 'alertas');
+  mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes');
+  fabNuevo.classList.toggle('hidden', miRol === 'visitante');
   btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
   btnCompartir.classList.remove('hidden');
   if(currentTab === 'clientes'){
     headerTitle.textContent = 'Clientes';
     searchEl.placeholder = 'Buscar cliente...';
     renderClientes(filtro);
-  }else if(currentTab === 'alertas'){
-    headerTitle.textContent = 'Alertas';
-    searchEl.placeholder = 'Buscar cliente...';
-    renderAlertas(filtro);
   }else{
     headerTitle.textContent = 'Movimientos';
     searchEl.placeholder = 'Buscar movimiento...';
@@ -1480,23 +1355,20 @@ function setTab(tab){
   currentTab = tab;
   document.getElementById('tab-clientes').classList.toggle('active', tab === 'clientes');
   document.getElementById('tab-mov').classList.toggle('active', tab === 'movimientos');
-  document.getElementById('tab-alertas').classList.toggle('active', tab === 'alertas');
   deseleccionarFila();
   render();
   // Solo sincronizamos automático al entrar a Clientes, como si se apretara
-  // el botón Actualizar. En Movimientos y Alertas se usa el dato ya cargado
+  // el botón Actualizar. En Movimientos se usa el dato ya cargado
   // (hay que tocar el botón de sincronizar a mano si hace falta refrescar).
   if(tab === 'clientes') cargarDatos();
 }
 
 document.getElementById('tab-clientes').addEventListener('click', () => setTab('clientes'));
 document.getElementById('tab-mov').addEventListener('click', () => setTab('movimientos'));
-document.getElementById('tab-alertas').addEventListener('click', () => setTab('alertas'));
 
 btnRefresh.addEventListener('click', cargarDatos);
 searchEl.addEventListener('input', () => {
   scrollState.clientes = 0;
-  scrollState.alertas = 0;
   scrollState.movimientos = { top: 0, left: 0 };
   render();
 });
@@ -1537,7 +1409,7 @@ async function generarImagenTabla(){
     throw new Error('No se pudo cargar la librería para generar imágenes. Revisá tu conexión a internet.');
   }
   const esMovimientos = currentTab === 'movimientos';
-  const titulo = currentTab === 'clientes' ? 'Clientes' : (currentTab === 'alertas' ? 'Alertas' : 'Movimientos');
+  const titulo = currentTab === 'clientes' ? 'Clientes' : 'Movimientos';
   const wrap = mainEl.querySelector(esMovimientos ? '.mov-table-wrap' : '.stock-table-wrap');
   if(!wrap) throw new Error('No hay tabla para capturar.');
 
@@ -1550,7 +1422,7 @@ async function generarImagenTabla(){
   `;
   const clon = wrap.cloneNode(true);
   // La tabla vive dentro de un contenedor con scroll propio (.mov-scroll
-  // en Movimientos, .clientes-scroll en Clientes/Alertas); para la
+  // en Movimientos, .clientes-scroll en Clientes); para la
   // captura no queremos ese recorte, así que mostramos la tabla completa.
   const scroll = clon.querySelector('.mov-scroll, .clientes-scroll') || clon;
   scroll.style.overflow = 'visible';
@@ -1605,7 +1477,7 @@ btnCompartirWhatsapp.addEventListener('click', async () => {
   // Compartir nativo con imagen adjunta (celular: abre WhatsApp entre las opciones).
   if(navigator.canShare && navigator.canShare({ files: [archivo] })){
     try{
-      await navigator.share({ files: [archivo], title: currentTab === 'clientes' ? 'Saldos de clientes' : (currentTab === 'alertas' ? 'Alertas de saldos' : 'Movimientos') });
+      await navigator.share({ files: [archivo], title: currentTab === 'clientes' ? 'Saldos de clientes' : 'Movimientos' });
       marcarCompartirOk();
       cerrarCompartirModal();
       return;
@@ -1630,9 +1502,7 @@ btnCompartir.addEventListener('click', async () => {
     compartirBlobActual = blob;
     compartirNombreActual = currentTab === 'clientes'
       ? `saldos-clientes-${fechaParaArchivo()}.png`
-      : currentTab === 'alertas'
-        ? `alertas-clientes-${fechaParaArchivo()}.png`
-        : `movimientos-${fechaParaArchivo()}.png`;
+      : `movimientos-${fechaParaArchivo()}.png`;
     compartirUrlActual = URL.createObjectURL(blob);
     compartirPreviewImg.src = compartirUrlActual;
     compartirModal.classList.remove('hidden');
@@ -1684,7 +1554,7 @@ function aplicarPermisosUI(){
   const esVisitante = miRol === 'visitante';
   fabEditar.classList.toggle('hidden', miRol !== 'admin');
   fabEliminar.classList.toggle('hidden', miRol !== 'admin');
-  fabNuevo.classList.toggle('hidden', esVisitante || currentTab === 'alertas');
+  fabNuevo.classList.toggle('hidden', esVisitante);
   if(esVisitante) fabAcciones.classList.add('hidden');
 }
 
