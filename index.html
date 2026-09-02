@@ -161,13 +161,13 @@
   table.clientes tr.cliente-row.selected td.nombre{ color:var(--azul-osc); }
 
   /* Cabeceras de grupo por Reparto (acordeón contraíble) */
-  table.clientes tr.categoria-row td{ background:#f7f9fd; border-top:1px solid var(--linea); }
-  table.clientes tr.categoria-row td.nombre{ font-size:13px; font-weight:700; color:var(--texto-tenue); text-transform:uppercase; letter-spacing:0.2px; }
+  table.clientes tr.categoria-row td{ background:var(--azul-suave); border-top:2px solid var(--azul-borde); padding-top:11px; padding-bottom:11px; }
+  table.clientes tr.categoria-row td.nombre{ font-size:13.5px; font-weight:800; color:var(--azul-osc); text-transform:uppercase; letter-spacing:0.3px; }
   table.clientes tr.categoria-row td.saldo{ font-size:14.5px; font-weight:700; color:#1a1f2b; }
   table.clientes tr.categoria-row td.saldo.pos{ color:var(--rojo); }
   table.clientes tr.categoria-row td.saldo.zero{ color:#9aa5ba; font-weight:600; }
   table.clientes tr.categoria-row{ cursor:pointer; user-select:none; }
-  table.clientes tr.categoria-row:active{ background:#eef1f8; }
+  table.clientes tr.categoria-row:active{ background:var(--azul-borde); }
   table.clientes tr.categoria-row .caret{
     display:inline-block; margin-right:6px; font-size:10px; color:var(--texto-tenue);
     transition:transform .15s ease;
@@ -1403,9 +1403,10 @@ function renderRevisionAgrupada(lista, mensajeVacio){
   const hayBusqueda = !!searchEl.value.trim();
 
   const bloques = categorias.map(cat => {
-    // Más reciente primero dentro de cada grupo.
+    // La más vieja primero, la más nueva al final del grupo (tomando
+    // "Fecha Revisión" como referencia), mismo criterio que Movimientos.
     const items = grupos[cat].slice().sort((a,b) =>
-      fechaComparable_(b.fechaRevision) - fechaComparable_(a.fechaRevision)
+      fechaComparable_(a.fechaRevision) - fechaComparable_(b.fechaRevision)
     );
     const colapsado = categoriasColapsadasRevision.has(cat) && !hayBusqueda;
 
