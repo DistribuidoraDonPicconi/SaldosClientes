@@ -178,6 +178,13 @@
   }
   table.clientes tbody.grupo-body.colapsado tr.cliente-row{ display:none; }
 
+  /* Filas de la pestaña Revisión (misma tabla agrupada que Clientes) */
+  table.clientes tr.rev-row{ cursor:pointer; }
+  table.clientes tr.rev-row:active{ background:var(--azul-suave); }
+  table.clientes tr.rev-row.selected td{ background:var(--azul-suave); }
+  table.clientes td.motivo{ font-size:13px; color:#1a1f2b; text-align:left; white-space:normal; word-break:break-word; }
+  table.clientes tbody.grupo-body.colapsado tr.rev-row{ display:none; }
+
 
   /* Tabla Movimientos */
   .mov-table-wrap{
@@ -186,7 +193,6 @@
   }
   .mov-scroll{ overflow:auto; -webkit-overflow-scrolling:touch; }
   table.mov{ border-collapse:separate; border-spacing:0; width:100%; min-width:1420px; }
-  table.mov.rev{ min-width:760px; }
   table.mov th{
     position:sticky; top:0; background:#fff; z-index:1;
     text-align:center; font-size:13.5px; color:#1a1f2b; font-weight:800;
@@ -214,10 +220,6 @@
   table.mov tbody tr.mov-row:active{ background:var(--azul-suave); }
   table.mov tbody tr.mov-row.selected td{ background:var(--azul-suave); }
   table.mov tbody tr.mov-row.selected td.fecha{ color:var(--azul-osc); }
-  table.mov tbody tr.rev-row{ cursor:pointer; }
-  table.mov tbody tr.rev-row:active{ background:var(--azul-suave); }
-  table.mov tbody tr.rev-row.selected td{ background:var(--azul-suave); }
-  table.mov tbody tr.rev-row.selected td.fecha{ color:var(--azul-osc); }
 
   /* Modal de confirmación (eliminar / cerrar sesión) */
   #confirm-eliminar-modal, #confirm-logout-modal{
@@ -616,9 +618,6 @@
         </div>
       </div>
 
-      <label for="nr-cliente">Cliente</label>
-      <input type="text" id="nr-cliente" placeholder="Ej: Fernanda" list="lista-clientes" autocomplete="off">
-
       <label>Reparto</label>
       <div class="nm-reparto-grid" id="nr-reparto-grid"></div>
       <input type="hidden" id="nr-reparto">
@@ -974,18 +973,13 @@ async function eliminarMovimientoFirestore_(id){
 
 // ============== Revisión: guardar / eliminar ==============
 async function guardarRevisionFirestore_(payload){
-  const cliente = String(payload.cliente || '').trim();
   const reparto = String(payload.reparto || '').trim();
   const fechaRevision = payload.fechaRevision;
   const fechaReparto = payload.fechaReparto || '';
   const motivo = String(payload.motivo || '').trim();
 
-  if(!cliente) throw new Error('Falta el cliente');
   if(!fechaRevision) throw new Error('Falta la fecha de revisión');
-  const existeCliente = clientes.some(c => String(c['Cliente'] || '').trim().toLowerCase() === cliente.toLowerCase());
-  if(!existeCliente){
-    throw new Error('El cliente "' + cliente + '" no está cargado en la lista de Clientes. Agregalo primero desde esa pestaña.');
-  }
+  if(!reparto) throw new Error('Falta el reparto');
 
   if(payload.id){
     if(miRol !== 'admin') throw new Error('Tu usuario no tiene permiso para editar una revisión. Solo un administrador puede hacerlo.');
@@ -994,7 +988,7 @@ async function guardarRevisionFirestore_(payload){
     if(!snap.exists) throw new Error('No se encontró la revisión a editar');
     await ref.update({
       'Fecha Revisión': fechaRevision, 'Fecha Reparto': fechaReparto,
-      'Cliente': cliente, 'Reparto': reparto, 'Motivo': motivo
+      'Reparto': reparto, 'Motivo': motivo
       // 'Usuario' y 'Orden' NO se tocan, igual que en Movimientos: se
       // conserva quién la cargó originalmente y su posición en la lista.
     });
@@ -1002,7 +996,7 @@ async function guardarRevisionFirestore_(payload){
     const ref = db.collection('revisiones').doc();
     await ref.set({
       'ID': ref.id, 'Fecha Revisión': fechaRevision, 'Fecha Reparto': fechaReparto,
-      'Cliente': cliente, 'Reparto': reparto, 'Motivo': motivo,
+      'Reparto': reparto, 'Motivo': motivo,
       'Usuario': miEmail,
       'Orden': firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -1174,7 +1168,6 @@ async function cargarDatos(){
     revisiones = revSnap.docs.map(d => Object.assign({}, d.data(), { ID: d.id }));
     actualizarListaClientes();
     if(currentTab === 'movimientos') irAlFondoMovimientos = true;
-    if(currentTab === 'revision') irAlFondoRevision = true;
     render();
   }catch(err){
     mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos de Firebase.<br>${err.message}</div>`;
@@ -1387,45 +1380,76 @@ function renderMovimientos(filtro){
 }
 
 /* ============== Pestaña Revisión ============== */
-function renderRevision(filtro){
-  // Ya vienen ordenados por "Orden" desde cargarDatos() (orden de carga,
-  // el más viejo primero); acá no hay que volver a ordenar.
-  const ordenados = revisiones;
+// Categorías de reparto colapsadas en la pestaña Revisión (estado propio,
+// independiente del de la pestaña Clientes, aunque usen los mismos nombres
+// de categoría).
+let categoriasColapsadasRevision = new Set();
 
-  const filas = ordenados
-    .filter(rev => {
-      if(!filtro) return true;
-      const texto = `${rev['Cliente']||''} ${rev['Reparto']||''} ${rev['Motivo']||''}`.toLowerCase();
-      return texto.includes(filtro.toLowerCase());
-    })
-    .map(rev => {
-      return `<tr class="rev-row" data-id="${rev['ID'] || ''}">
-        <td class="fecha">${formatFecha(rev['Fecha Revisión'])}</td>
-        <td class="fecha">${formatFecha(rev['Fecha Reparto'])}</td>
-        <td>${rev['Reparto'] || '-'}</td>
-        <td class="cliente">${rev['Cliente'] || '-'}</td>
-        <td class="notas">${rev['Motivo'] || '-'}</td>
-      </tr>`;
-    }).join('');
-
-  if(!filas){
-    mainEl.innerHTML = `<div class="state-msg">Sin revisiones que coincidan.</div>`;
+// Agrupa las revisiones en solapas contraíbles por Reparto, mismo criterio
+// visual que renderTablaClientesAgrupada (orden fijo de CONFIG.REPARTOS,
+// "Sin reparto" al final).
+function renderRevisionAgrupada(lista, mensajeVacio){
+  if(!lista.length){
+    mainEl.innerHTML = `<div class="state-msg">${mensajeVacio}</div>`;
     return;
   }
 
+  const grupos = {};
+  lista.forEach(r => {
+    const cat = r.reparto && CONFIG.REPARTOS.includes(r.reparto) ? r.reparto : 'Sin reparto';
+    (grupos[cat] = grupos[cat] || []).push(r);
+  });
+  const categorias = [...CONFIG.REPARTOS, 'Sin reparto'].filter(cat => grupos[cat] && grupos[cat].length);
+  const hayBusqueda = !!searchEl.value.trim();
+
+  const bloques = categorias.map(cat => {
+    // Más reciente primero dentro de cada grupo.
+    const items = grupos[cat].slice().sort((a,b) =>
+      fechaComparable_(b.fechaRevision) - fechaComparable_(a.fechaRevision)
+    );
+    const colapsado = categoriasColapsadasRevision.has(cat) && !hayBusqueda;
+
+    const filas = items.map(r => `<tr class="rev-row" data-id="${r.id}">
+      <td class="fecha">${formatFecha(r.fechaRevision)}</td>
+      <td class="fecha">${formatFecha(r.fechaReparto)}</td>
+      <td class="motivo">${r.motivo || '-'}</td>
+    </tr>`).join('');
+
+    return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}" data-grupo="${cat.replace(/"/g,'&quot;')}">
+      <tr class="categoria-row">
+        <td class="nombre" colspan="3"><span class="caret">▾</span>${cat} <span class="grupo-count">(${items.length})</span></td>
+      </tr>
+      ${filas}
+    </tbody>`;
+  }).join('');
+
   mainEl.innerHTML = `
-    <div class="mov-table-wrap">
-      <div class="mov-scroll" id="mov-scroll">
-        <table class="mov rev">
+    <div class="stock-table-wrap">
+      <div class="clientes-scroll">
+        <table class="clientes">
+          <colgroup>
+            <col style="width:96px"><col style="width:96px"><col>
+          </colgroup>
           <thead>
             <tr>
-              <th>Fecha Revisión</th><th>Fecha Reparto</th><th>Reparto</th><th>Cliente</th><th>Motivo</th>
+              <th>Fecha Revisión</th>
+              <th>Fecha Reparto</th>
+              <th>Motivo</th>
             </tr>
           </thead>
-          <tbody>${filas}</tbody>
+          ${bloques}
         </table>
       </div>
     </div>`;
+
+  mainEl.querySelectorAll('tr.categoria-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const cat = tr.closest('tbody').dataset.grupo;
+      if(categoriasColapsadasRevision.has(cat)) categoriasColapsadasRevision.delete(cat);
+      else categoriasColapsadasRevision.add(cat);
+      render();
+    });
+  });
 
   mainEl.querySelectorAll('tr.rev-row').forEach(tr => {
     tr.addEventListener('click', () => {
@@ -1437,6 +1461,24 @@ function renderRevision(filtro){
   actualizarSeleccionUI();
 }
 
+function renderRevision(filtro){
+  const lista = revisiones
+    .map(r => ({
+      id: r['ID'],
+      reparto: r['Reparto'] || '',
+      fechaRevision: r['Fecha Revisión'] || '',
+      fechaReparto: r['Fecha Reparto'] || '',
+      motivo: r['Motivo'] || ''
+    }))
+    .filter(r => {
+      if(!filtro) return true;
+      const texto = `${r.reparto} ${r.motivo}`.toLowerCase();
+      return texto.includes(filtro.toLowerCase());
+    });
+
+  renderRevisionAgrupada(lista, 'Sin revisiones que coincidan.');
+}
+
 function actualizarListaClientes(){
   const nombres = clientes.map(c => String(c['Cliente']||'').trim()).filter(Boolean)
     .sort((a,b) => a.localeCompare(b, 'es'));
@@ -1445,39 +1487,38 @@ function actualizarListaClientes(){
 }
 
 /* ============== Scroll / tabs ============== */
-const scrollState = { clientes: 0, movimientos: { top: 0, left: 0 }, revision: { top: 0, left: 0 } };
+const scrollState = { clientes: 0, movimientos: { top: 0, left: 0 }, revision: 0 };
 let irAlFondoMovimientos = false;
-let irAlFondoRevision = false;
 
 function guardarScrollActual(){
-  if(currentTab === 'movimientos' || currentTab === 'revision'){
-    const listaScroll = document.getElementById('mov-scroll');
-    if(listaScroll){
-      const estado = currentTab === 'movimientos' ? scrollState.movimientos : scrollState.revision;
-      estado.top = listaScroll.scrollTop;
-      estado.left = listaScroll.scrollLeft;
+  if(currentTab === 'movimientos'){
+    const movScroll = document.getElementById('mov-scroll');
+    if(movScroll){
+      scrollState.movimientos.top = movScroll.scrollTop;
+      scrollState.movimientos.left = movScroll.scrollLeft;
     }
+  }else if(currentTab === 'revision'){
+    scrollState.revision = mainEl.scrollTop;
   }else{
     scrollState.clientes = mainEl.scrollTop;
   }
 }
 
 function restaurarScroll(){
-  if(currentTab === 'movimientos' || currentTab === 'revision'){
-    const listaScroll = document.getElementById('mov-scroll');
-    if(listaScroll){
-      const irAlFondo = currentTab === 'movimientos' ? irAlFondoMovimientos : irAlFondoRevision;
-      const estado = currentTab === 'movimientos' ? scrollState.movimientos : scrollState.revision;
-      if(irAlFondo){
-        listaScroll.scrollTop = listaScroll.scrollHeight;
-        listaScroll.scrollLeft = 0;
-        if(currentTab === 'movimientos') irAlFondoMovimientos = false;
-        else irAlFondoRevision = false;
+  if(currentTab === 'movimientos'){
+    const movScroll = document.getElementById('mov-scroll');
+    if(movScroll){
+      if(irAlFondoMovimientos){
+        movScroll.scrollTop = movScroll.scrollHeight;
+        movScroll.scrollLeft = 0;
+        irAlFondoMovimientos = false;
       }else{
-        listaScroll.scrollTop = estado.top;
-        listaScroll.scrollLeft = estado.left;
+        movScroll.scrollTop = scrollState.movimientos.top;
+        movScroll.scrollLeft = scrollState.movimientos.left;
       }
     }
+  }else if(currentTab === 'revision'){
+    mainEl.scrollTop = scrollState.revision;
   }else{
     mainEl.scrollTop = scrollState.clientes;
   }
@@ -1485,8 +1526,8 @@ function restaurarScroll(){
 
 function render(){
   const filtro = searchEl.value.trim();
-  mainEl.classList.toggle('grid-mode', currentTab === 'movimientos' || currentTab === 'revision');
-  mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes');
+  mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
+  mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes' || currentTab === 'revision');
   fabNuevo.classList.toggle('hidden', miRol === 'visitante');
   btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
   btnCompartir.classList.remove('hidden');
@@ -1576,12 +1617,12 @@ async function generarImagenTabla(){
   if(!window.html2canvas){
     throw new Error('No se pudo cargar la librería para generar imágenes. Revisá tu conexión a internet.');
   }
-  const esListado = currentTab === 'movimientos' || currentTab === 'revision';
-  const titulo = currentTab === 'clientes' ? 'Clientes' : (currentTab === 'movimientos' ? 'Movimientos' : 'Revisión');
-  const wrap = mainEl.querySelector(esListado ? '.mov-table-wrap' : '.stock-table-wrap');
+  const esMovimientos = currentTab === 'movimientos';
+  const titulo = currentTab === 'clientes' ? 'Clientes' : (esMovimientos ? 'Movimientos' : 'Revisión');
+  const wrap = mainEl.querySelector(esMovimientos ? '.mov-table-wrap' : '.stock-table-wrap');
   if(!wrap) throw new Error('No hay tabla para capturar.');
 
-  const ancho = currentTab === 'clientes' ? 560 : (currentTab === 'movimientos' ? 1120 : 900);
+  const ancho = esMovimientos ? 1120 : (currentTab === 'clientes' ? 560 : 640);
   const contenedor = document.createElement('div');
   contenedor.style.cssText = `position:fixed; left:-9999px; top:0; width:${ancho}px; background:#ffffff; padding:22px; font-family:` + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';';
   contenedor.innerHTML = `
@@ -2177,7 +2218,6 @@ const nrEditId = document.getElementById('nr-edit-id');
 const nrTitulo = document.getElementById('nr-titulo');
 const nrFechaRevision = document.getElementById('nr-fecha-revision');
 const nrFechaReparto = document.getElementById('nr-fecha-reparto');
-const nrCliente = document.getElementById('nr-cliente');
 const nrRepartoGrid = document.getElementById('nr-reparto-grid');
 const nrReparto = document.getElementById('nr-reparto');
 const nrMotivo = document.getElementById('nr-motivo');
@@ -2212,7 +2252,6 @@ function abrirNuevaRevisionModal(rev, modoEditar){
   nrFechaReparto.value = (precargar && rev['Fecha Reparto'])
     ? fechaLocalInput(parsearFechaLocal_(rev['Fecha Reparto']))
     : '';
-  nrCliente.value = precargar ? (rev['Cliente'] || '') : '';
   seleccionarRepartoRevision(precargar ? (rev['Reparto'] || '') : '');
   nrMotivo.value = precargar ? (rev['Motivo'] || '') : '';
 
@@ -2235,23 +2274,17 @@ document.getElementById('nr-cancelar-btn').addEventListener('click', cerrarNueva
 nrGuardar.addEventListener('click', async () => {
   nrError.textContent = '';
 
-  const cliente = nrCliente.value.trim();
-  if(!cliente){
-    nrError.textContent = 'Completá el cliente.';
-    return;
-  }
-  const clienteExiste = clientes.some(c => String(c['Cliente']||'').trim().toLowerCase() === cliente.toLowerCase());
-  if(!clienteExiste){
-    nrError.textContent = `"${cliente}" no está cargado en Clientes. Agregalo primero desde esa pestaña.`;
-    return;
-  }
   if(!nrFechaRevision.value){
     nrError.textContent = 'Completá la fecha de revisión.';
     return;
   }
+  if(!nrReparto.value.trim()){
+    nrError.textContent = 'Seleccioná un reparto.';
+    return;
+  }
 
   const payload = {
-    cliente, reparto: nrReparto.value.trim(),
+    reparto: nrReparto.value.trim(),
     fechaRevision: nrFechaRevision.value,
     fechaReparto: nrFechaReparto.value,
     motivo: nrMotivo.value.trim()
