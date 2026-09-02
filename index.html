@@ -186,6 +186,7 @@
   }
   .mov-scroll{ overflow:auto; -webkit-overflow-scrolling:touch; }
   table.mov{ border-collapse:separate; border-spacing:0; width:100%; min-width:1420px; }
+  table.mov.rev{ min-width:760px; }
   table.mov th{
     position:sticky; top:0; background:#fff; z-index:1;
     text-align:center; font-size:13.5px; color:#1a1f2b; font-weight:800;
@@ -213,6 +214,10 @@
   table.mov tbody tr.mov-row:active{ background:var(--azul-suave); }
   table.mov tbody tr.mov-row.selected td{ background:var(--azul-suave); }
   table.mov tbody tr.mov-row.selected td.fecha{ color:var(--azul-osc); }
+  table.mov tbody tr.rev-row{ cursor:pointer; }
+  table.mov tbody tr.rev-row:active{ background:var(--azul-suave); }
+  table.mov tbody tr.rev-row.selected td{ background:var(--azul-suave); }
+  table.mov tbody tr.rev-row.selected td.fecha{ color:var(--azul-osc); }
 
   /* Modal de confirmación (eliminar / cerrar sesión) */
   #confirm-eliminar-modal, #confirm-logout-modal{
@@ -322,6 +327,12 @@
     display:flex; align-items:flex-start; justify-content:center;
   }
   #nuevo-cliente-modal.hidden{ display:none; }
+  #nueva-revision-modal{
+    position:fixed; inset:0; z-index:150;
+    background:rgba(17,22,36,0.55);
+    display:flex; align-items:flex-start; justify-content:center;
+  }
+  #nueva-revision-modal.hidden{ display:none; }
   .nuevo-box{
     width:100%; max-width:520px; max-height:88vh;
     background:#fff; border-radius:18px;
@@ -585,6 +596,44 @@
   </div>
 </div>
 
+<div id="nueva-revision-modal" class="hidden">
+  <div class="nuevo-box">
+    <div class="nuevo-header">
+      <h3 id="nr-titulo">Nueva revisión</h3>
+      <button class="nuevo-close" id="nr-cerrar" aria-label="Cerrar">×</button>
+    </div>
+    <div class="nuevo-body">
+      <input type="hidden" id="nr-edit-id">
+
+      <div class="nm-fecha-cliente-grid">
+        <div>
+          <label for="nr-fecha-revision">Fecha revisión</label>
+          <input type="date" id="nr-fecha-revision">
+        </div>
+        <div>
+          <label for="nr-fecha-reparto">Fecha reparto</label>
+          <input type="date" id="nr-fecha-reparto">
+        </div>
+      </div>
+
+      <label for="nr-cliente">Cliente</label>
+      <input type="text" id="nr-cliente" placeholder="Ej: Fernanda" list="lista-clientes" autocomplete="off">
+
+      <label>Reparto</label>
+      <div class="nm-reparto-grid" id="nr-reparto-grid"></div>
+      <input type="hidden" id="nr-reparto">
+
+      <label for="nr-motivo">Motivo</label>
+      <textarea id="nr-motivo" rows="3" placeholder="Motivo de la revisión"></textarea>
+    </div>
+    <div class="nuevo-error" id="nr-error"></div>
+    <div class="nuevo-footer">
+      <button class="btn-cancelar" id="nr-cancelar-btn">Cancelar</button>
+      <button class="btn-guardar" id="nr-guardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="app">
 
   <header>
@@ -613,6 +662,7 @@
   <div class="pill-tabs">
     <button id="tab-clientes" data-tab="clientes" class="active">Clientes</button>
     <button id="tab-mov" data-tab="movimientos">Movimientos</button>
+    <button id="tab-revision" data-tab="revision">Revisión</button>
   </div>
 
   <div class="search-wrap" id="search-wrap">
@@ -922,6 +972,55 @@ async function eliminarMovimientoFirestore_(id){
 }
 /* =============================================================== */
 
+// ============== Revisión: guardar / eliminar ==============
+async function guardarRevisionFirestore_(payload){
+  const cliente = String(payload.cliente || '').trim();
+  const reparto = String(payload.reparto || '').trim();
+  const fechaRevision = payload.fechaRevision;
+  const fechaReparto = payload.fechaReparto || '';
+  const motivo = String(payload.motivo || '').trim();
+
+  if(!cliente) throw new Error('Falta el cliente');
+  if(!fechaRevision) throw new Error('Falta la fecha de revisión');
+  const existeCliente = clientes.some(c => String(c['Cliente'] || '').trim().toLowerCase() === cliente.toLowerCase());
+  if(!existeCliente){
+    throw new Error('El cliente "' + cliente + '" no está cargado en la lista de Clientes. Agregalo primero desde esa pestaña.');
+  }
+
+  if(payload.id){
+    if(miRol !== 'admin') throw new Error('Tu usuario no tiene permiso para editar una revisión. Solo un administrador puede hacerlo.');
+    const ref = db.collection('revisiones').doc(String(payload.id));
+    const snap = await ref.get();
+    if(!snap.exists) throw new Error('No se encontró la revisión a editar');
+    await ref.update({
+      'Fecha Revisión': fechaRevision, 'Fecha Reparto': fechaReparto,
+      'Cliente': cliente, 'Reparto': reparto, 'Motivo': motivo
+      // 'Usuario' y 'Orden' NO se tocan, igual que en Movimientos: se
+      // conserva quién la cargó originalmente y su posición en la lista.
+    });
+  }else{
+    const ref = db.collection('revisiones').doc();
+    await ref.set({
+      'ID': ref.id, 'Fecha Revisión': fechaRevision, 'Fecha Reparto': fechaReparto,
+      'Cliente': cliente, 'Reparto': reparto, 'Motivo': motivo,
+      'Usuario': miEmail,
+      'Orden': firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  await cargarDatos();
+}
+
+async function eliminarRevisionFirestore_(id){
+  if(miRol !== 'admin') throw new Error('Tu usuario no tiene permiso para eliminar una revisión. Solo un administrador puede hacerlo.');
+  const ref = db.collection('revisiones').doc(String(id));
+  const snap = await ref.get();
+  if(!snap.exists) throw new Error('No se encontró la revisión a eliminar');
+  await ref.delete();
+  await cargarDatos();
+}
+/* =============================================================== */
+
 // ============== Clientes: guardar / eliminar ==============
 async function guardarClienteFirestore_(nombreNuevoIn, repartoIn, nombreOriginalIn){
   const nombreNuevo = String(nombreNuevoIn || '').trim();
@@ -991,6 +1090,7 @@ async function eliminarClienteFirestore_(nombreIn){
 
 let movimientos = [];
 let clientes = [];
+let revisiones = [];
 let currentTab = 'clientes';
 let miRol = null; // 'admin', 'colaborador' o 'visitante', lo manda el servidor en cada carga
 let miEmail = null; // email de Google de quien está logueado, para el campo "Cargado por"
@@ -1060,18 +1160,21 @@ function formatMoneda(n){
 async function cargarDatos(){
   btnRefresh.classList.add('spinning');
   try{
-    const [movSnap, cliSnap] = await Promise.all([
+    const [movSnap, cliSnap, revSnap] = await Promise.all([
       // orderBy('Orden'): sin esto, Firestore devuelve los movimientos en
       // un orden interno arbitrario (no el de carga). "Orden" se fija una
       // sola vez al crear el movimiento y nunca se toca al editar, así el
       // orden de la lista queda estable igual que las filas de un Sheet.
       db.collection('movimientos').orderBy('Orden', 'asc').get(),
-      db.collection('clientes').get()
+      db.collection('clientes').get(),
+      db.collection('revisiones').orderBy('Orden', 'asc').get()
     ]);
     movimientos = movSnap.docs.map(d => Object.assign({}, d.data(), { ID: d.id }));
     clientes = cliSnap.docs.map(d => Object.assign({}, d.data(), { _id: d.id }));
+    revisiones = revSnap.docs.map(d => Object.assign({}, d.data(), { ID: d.id }));
     actualizarListaClientes();
     if(currentTab === 'movimientos') irAlFondoMovimientos = true;
+    if(currentTab === 'revision') irAlFondoRevision = true;
     render();
   }catch(err){
     mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos de Firebase.<br>${err.message}</div>`;
@@ -1283,6 +1386,57 @@ function renderMovimientos(filtro){
   actualizarSeleccionUI();
 }
 
+/* ============== Pestaña Revisión ============== */
+function renderRevision(filtro){
+  // Ya vienen ordenados por "Orden" desde cargarDatos() (orden de carga,
+  // el más viejo primero); acá no hay que volver a ordenar.
+  const ordenados = revisiones;
+
+  const filas = ordenados
+    .filter(rev => {
+      if(!filtro) return true;
+      const texto = `${rev['Cliente']||''} ${rev['Reparto']||''} ${rev['Motivo']||''}`.toLowerCase();
+      return texto.includes(filtro.toLowerCase());
+    })
+    .map(rev => {
+      return `<tr class="rev-row" data-id="${rev['ID'] || ''}">
+        <td class="fecha">${formatFecha(rev['Fecha Revisión'])}</td>
+        <td class="fecha">${formatFecha(rev['Fecha Reparto'])}</td>
+        <td>${rev['Reparto'] || '-'}</td>
+        <td class="cliente">${rev['Cliente'] || '-'}</td>
+        <td class="notas">${rev['Motivo'] || '-'}</td>
+      </tr>`;
+    }).join('');
+
+  if(!filas){
+    mainEl.innerHTML = `<div class="state-msg">Sin revisiones que coincidan.</div>`;
+    return;
+  }
+
+  mainEl.innerHTML = `
+    <div class="mov-table-wrap">
+      <div class="mov-scroll" id="mov-scroll">
+        <table class="mov rev">
+          <thead>
+            <tr>
+              <th>Fecha Revisión</th><th>Fecha Reparto</th><th>Reparto</th><th>Cliente</th><th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  mainEl.querySelectorAll('tr.rev-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const id = tr.dataset.id;
+      filaSeleccionadaId = (filaSeleccionadaId === id) ? null : id;
+      actualizarSeleccionUI();
+    });
+  });
+  actualizarSeleccionUI();
+}
+
 function actualizarListaClientes(){
   const nombres = clientes.map(c => String(c['Cliente']||'').trim()).filter(Boolean)
     .sort((a,b) => a.localeCompare(b, 'es'));
@@ -1291,15 +1445,17 @@ function actualizarListaClientes(){
 }
 
 /* ============== Scroll / tabs ============== */
-const scrollState = { clientes: 0, movimientos: { top: 0, left: 0 } };
+const scrollState = { clientes: 0, movimientos: { top: 0, left: 0 }, revision: { top: 0, left: 0 } };
 let irAlFondoMovimientos = false;
+let irAlFondoRevision = false;
 
 function guardarScrollActual(){
-  if(currentTab === 'movimientos'){
-    const movScroll = document.getElementById('mov-scroll');
-    if(movScroll){
-      scrollState.movimientos.top = movScroll.scrollTop;
-      scrollState.movimientos.left = movScroll.scrollLeft;
+  if(currentTab === 'movimientos' || currentTab === 'revision'){
+    const listaScroll = document.getElementById('mov-scroll');
+    if(listaScroll){
+      const estado = currentTab === 'movimientos' ? scrollState.movimientos : scrollState.revision;
+      estado.top = listaScroll.scrollTop;
+      estado.left = listaScroll.scrollLeft;
     }
   }else{
     scrollState.clientes = mainEl.scrollTop;
@@ -1307,16 +1463,19 @@ function guardarScrollActual(){
 }
 
 function restaurarScroll(){
-  if(currentTab === 'movimientos'){
-    const movScroll = document.getElementById('mov-scroll');
-    if(movScroll){
-      if(irAlFondoMovimientos){
-        movScroll.scrollTop = movScroll.scrollHeight;
-        movScroll.scrollLeft = 0;
-        irAlFondoMovimientos = false;
+  if(currentTab === 'movimientos' || currentTab === 'revision'){
+    const listaScroll = document.getElementById('mov-scroll');
+    if(listaScroll){
+      const irAlFondo = currentTab === 'movimientos' ? irAlFondoMovimientos : irAlFondoRevision;
+      const estado = currentTab === 'movimientos' ? scrollState.movimientos : scrollState.revision;
+      if(irAlFondo){
+        listaScroll.scrollTop = listaScroll.scrollHeight;
+        listaScroll.scrollLeft = 0;
+        if(currentTab === 'movimientos') irAlFondoMovimientos = false;
+        else irAlFondoRevision = false;
       }else{
-        movScroll.scrollTop = scrollState.movimientos.top;
-        movScroll.scrollLeft = scrollState.movimientos.left;
+        listaScroll.scrollTop = estado.top;
+        listaScroll.scrollLeft = estado.left;
       }
     }
   }else{
@@ -1326,7 +1485,7 @@ function restaurarScroll(){
 
 function render(){
   const filtro = searchEl.value.trim();
-  mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
+  mainEl.classList.toggle('grid-mode', currentTab === 'movimientos' || currentTab === 'revision');
   mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes');
   fabNuevo.classList.toggle('hidden', miRol === 'visitante');
   btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
@@ -1335,10 +1494,14 @@ function render(){
     headerTitle.textContent = 'Clientes';
     searchEl.placeholder = 'Buscar cliente...';
     renderClientes(filtro);
-  }else{
+  }else if(currentTab === 'movimientos'){
     headerTitle.textContent = 'Movimientos';
     searchEl.placeholder = 'Buscar movimiento...';
     renderMovimientos(filtro);
+  }else{
+    headerTitle.textContent = 'Revisión';
+    searchEl.placeholder = 'Buscar revisión...';
+    renderRevision(filtro);
   }
   restaurarScroll();
   posicionarFabs();
@@ -1358,6 +1521,7 @@ function setTab(tab){
   currentTab = tab;
   document.getElementById('tab-clientes').classList.toggle('active', tab === 'clientes');
   document.getElementById('tab-mov').classList.toggle('active', tab === 'movimientos');
+  document.getElementById('tab-revision').classList.toggle('active', tab === 'revision');
   deseleccionarFila();
   render();
   // Solo sincronizamos automático al entrar a Clientes, como si se apretara
@@ -1368,6 +1532,7 @@ function setTab(tab){
 
 document.getElementById('tab-clientes').addEventListener('click', () => setTab('clientes'));
 document.getElementById('tab-mov').addEventListener('click', () => setTab('movimientos'));
+document.getElementById('tab-revision').addEventListener('click', () => setTab('revision'));
 
 btnRefresh.addEventListener('click', cargarDatos);
 searchEl.addEventListener('input', () => {
@@ -1411,12 +1576,12 @@ async function generarImagenTabla(){
   if(!window.html2canvas){
     throw new Error('No se pudo cargar la librería para generar imágenes. Revisá tu conexión a internet.');
   }
-  const esMovimientos = currentTab === 'movimientos';
-  const titulo = currentTab === 'clientes' ? 'Clientes' : 'Movimientos';
-  const wrap = mainEl.querySelector(esMovimientos ? '.mov-table-wrap' : '.stock-table-wrap');
+  const esListado = currentTab === 'movimientos' || currentTab === 'revision';
+  const titulo = currentTab === 'clientes' ? 'Clientes' : (currentTab === 'movimientos' ? 'Movimientos' : 'Revisión');
+  const wrap = mainEl.querySelector(esListado ? '.mov-table-wrap' : '.stock-table-wrap');
   if(!wrap) throw new Error('No hay tabla para capturar.');
 
-  const ancho = esMovimientos ? 1120 : 560;
+  const ancho = currentTab === 'clientes' ? 560 : (currentTab === 'movimientos' ? 1120 : 900);
   const contenedor = document.createElement('div');
   contenedor.style.cssText = `position:fixed; left:-9999px; top:0; width:${ancho}px; background:#ffffff; padding:22px; font-family:` + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';';
   contenedor.innerHTML = `
@@ -1476,11 +1641,12 @@ btnCompartirDescargar.addEventListener('click', () => {
 btnCompartirWhatsapp.addEventListener('click', async () => {
   if(!compartirBlobActual) return;
   const archivo = new File([compartirBlobActual], compartirNombreActual, { type: 'image/png' });
+  const tituloCompartir = currentTab === 'clientes' ? 'Saldos de clientes' : (currentTab === 'movimientos' ? 'Movimientos' : 'Revisión');
 
   // Compartir nativo con imagen adjunta (celular: abre WhatsApp entre las opciones).
   if(navigator.canShare && navigator.canShare({ files: [archivo] })){
     try{
-      await navigator.share({ files: [archivo], title: currentTab === 'clientes' ? 'Saldos de clientes' : 'Movimientos' });
+      await navigator.share({ files: [archivo], title: tituloCompartir });
       marcarCompartirOk();
       cerrarCompartirModal();
       return;
@@ -1505,7 +1671,9 @@ btnCompartir.addEventListener('click', async () => {
     compartirBlobActual = blob;
     compartirNombreActual = currentTab === 'clientes'
       ? `saldos-clientes-${fechaParaArchivo()}.png`
-      : `movimientos-${fechaParaArchivo()}.png`;
+      : (currentTab === 'movimientos'
+        ? `movimientos-${fechaParaArchivo()}.png`
+        : `revision-${fechaParaArchivo()}.png`);
     compartirUrlActual = URL.createObjectURL(blob);
     compartirPreviewImg.src = compartirUrlActual;
     compartirModal.classList.remove('hidden');
@@ -1538,11 +1706,16 @@ function actualizarIconosFabAcciones(){
     fabCopiar.setAttribute('aria-label', 'Ver movimientos del cliente');
     fabEditar.setAttribute('aria-label', 'Editar cliente');
     fabEliminar.setAttribute('aria-label', 'Eliminar cliente');
-  }else{
+  }else if(currentTab === 'movimientos'){
     fabCopiar.innerHTML = ICONO_COPIAR_MOV;
     fabCopiar.setAttribute('aria-label', 'Copiar movimiento');
     fabEditar.setAttribute('aria-label', 'Editar movimiento');
     fabEliminar.setAttribute('aria-label', 'Eliminar movimiento');
+  }else{
+    fabCopiar.innerHTML = ICONO_COPIAR_MOV;
+    fabCopiar.setAttribute('aria-label', 'Copiar revisión');
+    fabEditar.setAttribute('aria-label', 'Editar revisión');
+    fabEliminar.setAttribute('aria-label', 'Eliminar revisión');
   }
 }
 
@@ -1574,8 +1747,9 @@ function actualizarSeleccionUI(){
     if(clienteSeleccionadoNombre && !encontrada) clienteSeleccionadoNombre = null;
     fabAcciones.classList.toggle('hidden', miRol === 'visitante' || !clienteSeleccionadoNombre);
   }else{
+    const selectorFila = currentTab === 'movimientos' ? 'tr.mov-row' : 'tr.rev-row';
     let encontrada = false;
-    mainEl.querySelectorAll('tr.mov-row').forEach(tr => {
+    mainEl.querySelectorAll(selectorFila).forEach(tr => {
       const esta = tr.dataset.id === filaSeleccionadaId;
       tr.classList.toggle('selected', esta);
       if(esta) encontrada = true;
@@ -1804,7 +1978,8 @@ function posicionarNuevoBox(box){
 fabNuevo.addEventListener('click', () => {
   if(miRol === 'visitante') return; // el botón ya está oculto para visitante; esto es un resguardo extra
   if(currentTab === 'clientes') abrirNuevoClienteModal();
-  else abrirNuevoModal();
+  else if(currentTab === 'movimientos') abrirNuevoModal();
+  else abrirNuevaRevisionModal();
 });
 document.getElementById('nuevo-cerrar').addEventListener('click', cerrarNuevoModal);
 document.getElementById('nuevo-cancelar-btn').addEventListener('click', cerrarNuevoModal);
@@ -1820,7 +1995,7 @@ fabEditar.addEventListener('click', async () => {
     if(!(await pedirLock(idLock))) return;
     lockIdActivo = idLock;
     abrirNuevoClienteModal(cli);
-  }else{
+  }else if(currentTab === 'movimientos'){
     const mov = movimientos.find(m => String(m['ID']) === String(filaSeleccionadaId));
     deseleccionarFila();
     if(!mov) return;
@@ -1828,6 +2003,14 @@ fabEditar.addEventListener('click', async () => {
     if(!(await pedirLock(idLock))) return;
     lockIdActivo = idLock;
     abrirNuevoModal(mov, true);
+  }else{
+    const rev = revisiones.find(r => String(r['ID']) === String(filaSeleccionadaId));
+    deseleccionarFila();
+    if(!rev) return;
+    const idLock = 'revision_' + String(rev['ID']);
+    if(!(await pedirLock(idLock))) return;
+    lockIdActivo = idLock;
+    abrirNuevaRevisionModal(rev, true);
   }
 });
 
@@ -1841,10 +2024,14 @@ fabCopiar.addEventListener('click', () => {
       searchEl.value = nombre;
       render();
     }
-  }else{
+  }else if(currentTab === 'movimientos'){
     const mov = movimientos.find(m => String(m['ID']) === String(filaSeleccionadaId));
     deseleccionarFila();
     if(mov) abrirNuevoModal(mov, false);
+  }else{
+    const rev = revisiones.find(r => String(r['ID']) === String(filaSeleccionadaId));
+    deseleccionarFila();
+    if(rev) abrirNuevaRevisionModal(rev, false);
   }
 });
 
@@ -1853,6 +2040,7 @@ const confirmEliminarTitulo = document.getElementById('confirm-eliminar-titulo')
 const confirmEliminarTexto = document.getElementById('confirm-eliminar-texto');
 let idAEliminar = null;
 let clienteAEliminar = null;
+let tipoIdAEliminar = null; // 'movimiento' o 'revision', para saber qué borrar cuando idAEliminar está seteado
 
 fabEliminar.addEventListener('click', () => {
   if(miRol !== 'admin') return; // el botón ya está oculto para colaborador/visitante; esto es un resguardo extra
@@ -1863,12 +2051,21 @@ fabEliminar.addEventListener('click', () => {
     confirmEliminarTitulo.textContent = 'Eliminar cliente';
     confirmEliminarTexto.textContent = 'Esta acción borra el cliente de la lista, tanto de la app como del Google Sheet. Si el cliente tiene movimientos cargados, primero hay que eliminarlos. No se puede deshacer.';
     confirmEliminarModal.classList.remove('hidden');
-  }else{
+  }else if(currentTab === 'movimientos'){
     idAEliminar = filaSeleccionadaId;
+    tipoIdAEliminar = 'movimiento';
     deseleccionarFila();
     if(!idAEliminar) return;
     confirmEliminarTitulo.textContent = 'Eliminar movimiento';
     confirmEliminarTexto.textContent = 'Esta acción borra el movimiento de forma permanente, tanto de la app como del Google Sheet, y recalcula el saldo del cliente. No se puede deshacer.';
+    confirmEliminarModal.classList.remove('hidden');
+  }else{
+    idAEliminar = filaSeleccionadaId;
+    tipoIdAEliminar = 'revision';
+    deseleccionarFila();
+    if(!idAEliminar) return;
+    confirmEliminarTitulo.textContent = 'Eliminar revisión';
+    confirmEliminarTexto.textContent = 'Esta acción borra la revisión de forma permanente. No se puede deshacer.';
     confirmEliminarModal.classList.remove('hidden');
   }
 });
@@ -1877,6 +2074,7 @@ document.getElementById('confirm-eliminar-cancelar').addEventListener('click', (
   confirmEliminarModal.classList.add('hidden');
   idAEliminar = null;
   clienteAEliminar = null;
+  tipoIdAEliminar = null;
 });
 
 document.getElementById('confirm-eliminar-aceptar').addEventListener('click', async () => {
@@ -1886,11 +2084,13 @@ document.getElementById('confirm-eliminar-aceptar').addEventListener('click', as
   btnAceptar.textContent = 'Eliminando...';
   try{
     if(clienteAEliminar) await eliminarClienteFirestore_(clienteAEliminar);
+    else if(tipoIdAEliminar === 'revision') await eliminarRevisionFirestore_(idAEliminar);
     else await eliminarMovimientoFirestore_(idAEliminar);
 
     confirmEliminarModal.classList.add('hidden');
     idAEliminar = null;
     clienteAEliminar = null;
+    tipoIdAEliminar = null;
   }catch(err){
     alert('No se pudo eliminar: ' + err.message);
   }finally{
@@ -1970,6 +2170,108 @@ ncGuardar.addEventListener('click', async () => {
     ncGuardar.textContent = 'Guardar';
   }
 });
+
+/* ============== Nueva / editar revisión ============== */
+const nuevaRevisionModal = document.getElementById('nueva-revision-modal');
+const nrEditId = document.getElementById('nr-edit-id');
+const nrTitulo = document.getElementById('nr-titulo');
+const nrFechaRevision = document.getElementById('nr-fecha-revision');
+const nrFechaReparto = document.getElementById('nr-fecha-reparto');
+const nrCliente = document.getElementById('nr-cliente');
+const nrRepartoGrid = document.getElementById('nr-reparto-grid');
+const nrReparto = document.getElementById('nr-reparto');
+const nrMotivo = document.getElementById('nr-motivo');
+const nrError = document.getElementById('nr-error');
+const nrGuardar = document.getElementById('nr-guardar');
+
+nrRepartoGrid.innerHTML = CONFIG.REPARTOS.map(r => `
+  <button type="button" class="nm-reparto-btn" data-reparto="${r}">${r}</button>
+`).join('');
+
+function seleccionarRepartoRevision(valor){
+  nrReparto.value = valor;
+  nrRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.reparto === valor);
+  });
+}
+
+nrRepartoGrid.querySelectorAll('.nm-reparto-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    seleccionarRepartoRevision(nrReparto.value === btn.dataset.reparto ? '' : btn.dataset.reparto);
+  });
+});
+
+function abrirNuevaRevisionModal(rev, modoEditar){
+  const precargar = !!rev;
+  nrEditId.value = (precargar && modoEditar) ? (rev['ID'] || '') : '';
+  nrTitulo.textContent = modoEditar ? 'Editar revisión' : (precargar ? 'Copiar revisión' : 'Nueva revisión');
+
+  nrFechaRevision.value = precargar && rev['Fecha Revisión']
+    ? fechaLocalInput(parsearFechaLocal_(rev['Fecha Revisión']))
+    : fechaLocalInput(new Date());
+  nrFechaReparto.value = (precargar && rev['Fecha Reparto'])
+    ? fechaLocalInput(parsearFechaLocal_(rev['Fecha Reparto']))
+    : '';
+  nrCliente.value = precargar ? (rev['Cliente'] || '') : '';
+  seleccionarRepartoRevision(precargar ? (rev['Reparto'] || '') : '');
+  nrMotivo.value = precargar ? (rev['Motivo'] || '') : '';
+
+  nrError.textContent = '';
+  nrGuardar.disabled = false;
+  nrGuardar.textContent = modoEditar ? 'Guardar cambios' : (precargar ? 'Guardar copia' : 'Guardar');
+  nuevaRevisionModal.classList.remove('hidden');
+  posicionarNuevoBox(document.querySelector('#nueva-revision-modal .nuevo-box'));
+  document.querySelectorAll('#nueva-revision-modal .nuevo-body')[0].scrollTop = 0;
+}
+
+function cerrarNuevaRevisionModal(){
+  nuevaRevisionModal.classList.add('hidden');
+  liberarLockActivo();
+}
+
+document.getElementById('nr-cerrar').addEventListener('click', cerrarNuevaRevisionModal);
+document.getElementById('nr-cancelar-btn').addEventListener('click', cerrarNuevaRevisionModal);
+
+nrGuardar.addEventListener('click', async () => {
+  nrError.textContent = '';
+
+  const cliente = nrCliente.value.trim();
+  if(!cliente){
+    nrError.textContent = 'Completá el cliente.';
+    return;
+  }
+  const clienteExiste = clientes.some(c => String(c['Cliente']||'').trim().toLowerCase() === cliente.toLowerCase());
+  if(!clienteExiste){
+    nrError.textContent = `"${cliente}" no está cargado en Clientes. Agregalo primero desde esa pestaña.`;
+    return;
+  }
+  if(!nrFechaRevision.value){
+    nrError.textContent = 'Completá la fecha de revisión.';
+    return;
+  }
+
+  const payload = {
+    cliente, reparto: nrReparto.value.trim(),
+    fechaRevision: nrFechaRevision.value,
+    fechaReparto: nrFechaReparto.value,
+    motivo: nrMotivo.value.trim()
+  };
+  if(nrEditId.value) payload.id = nrEditId.value;
+
+  nrGuardar.disabled = true;
+  nrGuardar.textContent = 'Guardando...';
+
+  try{
+    await guardarRevisionFirestore_(payload);
+    cerrarNuevaRevisionModal();
+  }catch(err){
+    nrError.textContent = 'No se pudo guardar: ' + err.message;
+  }finally{
+    nrGuardar.disabled = false;
+    nrGuardar.textContent = 'Guardar';
+  }
+});
+/* =================================================== */
 
 btnGuardar.addEventListener('click', async () => {
   nuevoError.textContent = '';
