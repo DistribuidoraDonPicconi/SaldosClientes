@@ -642,9 +642,6 @@
         <div class="sub">Distribuidora Don Picconi</div>
       </div>
       <div style="display:flex; gap:22px;">
-        <button class="icon-btn hidden" id="btn-ocultar-cero" aria-label="Ocultar clientes en $0">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.6 10.6 0 0 1 12 4c7 0 11 8 11 8a20.6 20.6 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-        </button>
         <button class="icon-btn hidden" id="btn-compartir" aria-label="Compartir">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         </button>
@@ -1094,7 +1091,6 @@ const searchEl = document.getElementById('search');
 const searchWrapEl = document.getElementById('search-wrap');
 const headerTitle = document.getElementById('header-title');
 const btnRefresh = document.getElementById('btn-refresh');
-const btnOcultarCero = document.getElementById('btn-ocultar-cero');
 const btnCompartir = document.getElementById('btn-compartir');
 
 // Convierte el valor de "Fecha" que viene del servidor a un Date local,
@@ -1177,7 +1173,9 @@ async function cargarDatos(){
 }
 
 /* ============== Pestaña Clientes (lista maestra + saldo) ============== */
-let ocultarSinSaldo = false;
+// Los clientes con saldo $0 quedan ocultos siempre por defecto (ya no hay
+// botón para alternarlo).
+let ocultarSinSaldo = true;
 let ultimaListaClientesVisible = [];
 // Categorías de reparto colapsadas en la pestaña Clientes (persiste
 // mientras la app queda abierta; al recargar vuelven a estar todas
@@ -1530,7 +1528,6 @@ function render(){
   mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
   mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes' || currentTab === 'revision');
   fabNuevo.classList.toggle('hidden', miRol === 'visitante');
-  btnOcultarCero.classList.toggle('hidden', currentTab !== 'clientes');
   btnCompartir.classList.remove('hidden');
   if(currentTab === 'clientes'){
     headerTitle.textContent = 'Clientes';
@@ -1583,15 +1580,6 @@ searchEl.addEventListener('input', () => {
   render();
 });
 
-// Ocultar/mostrar clientes con saldo $0 (solo afecta lo que se ve y lo
-// que se comparte; no borra ni modifica ningún dato).
-btnOcultarCero.addEventListener('click', () => {
-  ocultarSinSaldo = !ocultarSinSaldo;
-  btnOcultarCero.classList.toggle('active', ocultarSinSaldo);
-  btnOcultarCero.setAttribute('aria-label', ocultarSinSaldo ? 'Mostrar clientes en $0' : 'Ocultar clientes en $0');
-  render();
-});
-
 /* ============== Compartir imagen (Clientes y Movimientos) ============== */
 
 // Nombre de archivo con fecha, sin caracteres raros.
@@ -1623,9 +1611,14 @@ async function generarImagenTabla(){
   const wrap = mainEl.querySelector(esMovimientos ? '.mov-table-wrap' : '.stock-table-wrap');
   if(!wrap) throw new Error('No hay tabla para capturar.');
 
-  const ancho = esMovimientos ? 1120 : (currentTab === 'clientes' ? 560 : 640);
+  // En Movimientos el ancho de la tabla depende de su contenido (columna
+  // "Notas" variable) y no de un valor fijo, así que dejamos que el
+  // contenedor se ajuste al contenido (min-width igual al de la tabla,
+  // definido en CSS) en vez de forzar un ancho que la recortaba. En
+  // Clientes/Revisión sí conviene un ancho fijo prolijo.
+  const anchoFijo = currentTab === 'clientes' ? 560 : (esMovimientos ? null : 640);
   const contenedor = document.createElement('div');
-  contenedor.style.cssText = `position:fixed; left:-9999px; top:0; width:${ancho}px; background:#ffffff; padding:22px; font-family:` + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';';
+  contenedor.style.cssText = `position:fixed; left:-9999px; top:0; background:#ffffff; padding:22px; font-family:` + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';' + (anchoFijo ? ` width:${anchoFijo}px;` : ' width:max-content;');
   contenedor.innerHTML = `
     <div style="font-size:21px;font-weight:800;color:#111624;letter-spacing:-0.4px;margin-bottom:2px;">${titulo}</div>
     <div style="font-size:14px;font-weight:700;color:#2a5cc9;margin-bottom:16px;">Distribuidora Don Picconi — ${new Date().toLocaleDateString('es-AR')}</div>
@@ -1637,6 +1630,17 @@ async function generarImagenTabla(){
   const scroll = clon.querySelector('.mov-scroll, .clientes-scroll') || clon;
   scroll.style.overflow = 'visible';
   scroll.style.maxHeight = 'none';
+  scroll.style.width = 'max-content';
+  // En Movimientos sacamos la columna "Usuario" de la imagen (queda solo
+  // en pantalla): no aporta al reparto/cliente y así entra más ancha la
+  // columna de Notas.
+  if(esMovimientos){
+    clon.querySelectorAll('th, td').forEach(celda => {
+      if(celda.classList.contains('usuario')) { celda.remove(); return; }
+    });
+    const ths = clon.querySelectorAll('thead th');
+    ths.forEach(th => { if(th.textContent.trim() === 'Usuario') th.remove(); });
+  }
   contenedor.appendChild(clon);
   document.body.appendChild(contenedor);
 
