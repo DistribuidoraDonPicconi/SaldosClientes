@@ -1627,7 +1627,17 @@ async function generarImagenTabla(){
   // contenedor se ajuste al contenido (min-width igual al de la tabla,
   // definido en CSS) en vez de forzar un ancho que la recortaba. En
   // Clientes/Revisión sí conviene un ancho fijo prolijo.
-  const anchoFijo = currentTab === 'clientes' ? 560 : (esMovimientos ? null : 640);
+  // En Clientes/Revisión la tabla tiene un ancho mínimo (580px en CSS) y en
+  // pantalla se desplaza horizontalmente. Para la imagen medimos el ancho real
+  // de la tabla y hacemos el contenedor igual de ancho (+ el padding), si no
+  // la columna Saldo quedaba recortada. Además NO usamos width:max-content:
+  // html2canvas no lo resuelve bien en tablas y dejaba todo el texto en blanco.
+  let anchoTabla = null;
+  if(!esMovimientos){
+    const tablaOriginal = wrap.querySelector('table');
+    anchoTabla = Math.max(580, Math.ceil(tablaOriginal ? tablaOriginal.getBoundingClientRect().width : 580));
+  }
+  const anchoFijo = esMovimientos ? null : anchoTabla + 44;
   const contenedor = document.createElement('div');
   contenedor.style.cssText = `position:fixed; left:-9999px; top:0; background:#ffffff; padding:22px; font-family:` + getComputedStyle(document.body).fontFamily.replace(/'/g, '') + ';' + (anchoFijo ? ` width:${anchoFijo}px;` : ' width:max-content;');
   contenedor.innerHTML = `
@@ -1641,7 +1651,16 @@ async function generarImagenTabla(){
   const scroll = clon.querySelector('.mov-scroll, .clientes-scroll') || clon;
   scroll.style.overflow = 'visible';
   scroll.style.maxHeight = 'none';
-  scroll.style.width = 'max-content';
+  if(esMovimientos){
+    scroll.style.width = 'max-content';
+  }else{
+    scroll.style.width = anchoTabla + 'px';
+    const tablaClon = clon.querySelector('table');
+    if(tablaClon){
+      tablaClon.style.width = anchoTabla + 'px';
+      tablaClon.style.minWidth = anchoTabla + 'px';
+    }
+  }
   // En Movimientos sacamos la columna "Usuario" de la imagen (queda solo
   // en pantalla): no aporta al reparto/cliente y así entra más ancha la
   // columna de Notas.
