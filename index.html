@@ -789,8 +789,9 @@ auth.onAuthStateChanged(async (user) => {
     ocultarLogin();
     await cargarDatos();
   }catch(err){
-    loginError.textContent = 'No se pudo cargar la app: ' + err.message;
-    await auth.signOut();
+    // No cerramos la sesión por un error pasajero (red, etc.): se muestra el
+    // aviso y el usuario puede reintentar con el botón de actualizar.
+    mainEl.innerHTML = `<div class="state-msg error">No se pudo cargar la app.<br>${err.message}</div>`;
   }
 });
 
@@ -1167,6 +1168,11 @@ async function cargarDatos(){
     if(currentTab === 'movimientos') irAlFondoMovimientos = true;
     render();
   }catch(err){
+    if(err && err.code === 'permission-denied'){
+      loginError.textContent = 'Tu cuenta no tiene permiso para ver los datos.';
+      auth.signOut();
+      return;
+    }
     mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos de Firebase.<br>${err.message}</div>`;
   }finally{
     btnRefresh.classList.remove('spinning');
