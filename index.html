@@ -215,6 +215,9 @@
   table.mov td.num.pos{ color:var(--verde); }
   table.mov td.num.neg{ color:var(--rojo); }
   table.mov td.num.imp{ color:var(--azul-osc); }
+  /* Columna Saldo: tonos un poco más claros para diferenciarla de Saldo Acumulado */
+  table.mov td.num.sal.neg{ color:#d9534f; }
+  table.mov td.num.sal.pos{ color:#3a9d63; }
   table.mov td.num.zero{ color:#c3cad9; font-weight:500; }
   table.mov tbody tr:nth-child(even){ background:#fafbfd; }
   table.mov tbody tr.mov-row{ cursor:pointer; }
@@ -1346,7 +1349,7 @@ function renderMovimientos(filtro){
         <td class="num ${clsSaldoAnterior}">${formatMoneda(saldoAnterior)}</td>
         ${celdaImporte}
         ${celdaEntrego}
-        <td class="num ${clsSaldo}">${formatMoneda(saldo)}</td>
+        <td class="num sal ${clsSaldo}">${formatMoneda(saldo)}</td>
         <td class="num ${clsSaldoAcum}">${formatMoneda(saldoAcum)}</td>
         <td class="notas">${mov['Notas'] || '-'}</td>
         <td class="usuario">${mov['Usuario'] || '-'}</td>
