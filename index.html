@@ -214,6 +214,7 @@
   table.mov td.num{ text-align:center; font-weight:700; }
   table.mov td.num.pos{ color:var(--verde); }
   table.mov td.num.neg{ color:var(--rojo); }
+  table.mov td.num.imp{ color:var(--azul-osc); }
   table.mov td.num.zero{ color:#c3cad9; font-weight:500; }
   table.mov tbody tr:nth-child(even){ background:#fafbfd; }
   table.mov tbody tr.mov-row{ cursor:pointer; }
@@ -1332,8 +1333,8 @@ function renderMovimientos(filtro){
       const saldo = parseFloat(mov['Saldo']);
       const saldoAcum = parseFloat(mov['Saldo Acumulado']);
 
-      const celdaImporte = !importe ? `<td class="num zero">-</td>` : `<td class="num pos">${formatMoneda(importe)}</td>`;
-      const celdaEntrego = !entrego ? `<td class="num zero">-</td>` : `<td class="num neg">${formatMoneda(entrego)}</td>`;
+      const celdaImporte = !importe ? `<td class="num zero">-</td>` : `<td class="num imp">${formatMoneda(importe)}</td>`;
+      const celdaEntrego = !entrego ? `<td class="num zero">-</td>` : `<td class="num pos">${formatMoneda(entrego)}</td>`;
       const clsSaldoAnterior = saldoAnterior > 0 ? 'neg' : (saldoAnterior < 0 ? 'pos' : 'zero');
       const clsSaldo = saldo > 0 ? 'neg' : (saldo < 0 ? 'pos' : 'zero');
       const clsSaldoAcum = saldoAcum > 0 ? 'neg' : (saldoAcum < 0 ? 'pos' : 'zero');
