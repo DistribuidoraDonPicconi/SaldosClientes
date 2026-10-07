@@ -771,7 +771,9 @@ function iniciarLogin(){
 // Única fuente de verdad de la sesión: Firebase Auth. Cuando cambia
 // (login, logout, o al recargar la página con sesión ya persistida),
 // buscamos el rol del usuario en la colección "roles" de Firestore.
+let sesionResuelta = false; // pasa a true cuando Firebase responde por primera vez
 auth.onAuthStateChanged(async (user) => {
+  sesionResuelta = true;
   if(!user){
     miEmail = null;
     miRol = null;
@@ -798,6 +800,15 @@ auth.onAuthStateChanged(async (user) => {
     mainEl.innerHTML = `<div class="state-msg error">No se pudo cargar la app.<br>${err.message}</div>`;
   }
 });
+
+// Si Firebase no responde (sin internet, bloqueado, etc.), no dejamos la
+// pantalla en "Verificando sesión..." para siempre: mostramos el botón.
+setTimeout(() => {
+  if(!sesionResuelta){
+    loginError.textContent = 'No se pudo verificar la sesión. Iniciá sesión de nuevo.';
+    mostrarLogin();
+  }
+}, 8000);
 
 btnLogout.addEventListener('click', () => {
   document.getElementById('confirm-logout-modal').classList.remove('hidden');
