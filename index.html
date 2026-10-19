@@ -114,6 +114,16 @@
   }
   .search-wrap input:focus{ border-color:var(--azul); }
   .search-wrap input::placeholder{ color:#a7b2c6; }
+  .chips-rapidos{ display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+  .chips-rapidos.hidden{ display:none; }
+  .chip-rapido{
+    padding:7px 12px; border-radius:11px; border:1.5px solid var(--azul-borde);
+    background:#f2f4f8; color:#3a4560; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .chip-rapido.active{
+    background:var(--azul); border-color:var(--azul); color:#fff;
+    box-shadow:0 2px 6px rgba(42,92,201,0.35);
+  }
 
   /* Content */
   main{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:8px 20px 24px; }
@@ -374,6 +384,9 @@
     resize:vertical; text-align:left;
   }
   .nuevo-body textarea:focus{ border-color:var(--azul); }
+  /* Notas: ancho completo, sin poder agrandarla a mano y con la misma altura que Importe/Entregó */
+  #nm-notas, #nm-importe, #nm-entrego{ height:46px; }
+  #nm-notas{ resize:none; line-height:20px; overflow-y:auto; }
 
   .nm-reparto-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .nm-reparto-btn{
@@ -430,25 +443,51 @@
   #login-screen{
     position:fixed; inset:0; z-index:300;
     background:var(--fondo);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:24px; text-align:center;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
   }
   #login-screen.hidden{ display:none; }
-  #login-screen h1{ font-size:24px; margin:0 0 4px; color:#111624; font-weight:800; }
-  #login-screen .sub{ font-size:14px; color:var(--azul); font-weight:700; margin-bottom:32px; }
-  #login-screen .login-error{ color:var(--rojo); font-size:13.5px; font-weight:600; margin-top:18px; max-width:300px; min-height:18px; }
-  #login-screen .login-checking{ color:var(--texto-tenue); font-size:14px; }
-  #google-btn-container{ min-height:44px; }
+  .lock-box{
+    width:100%; max-width:320px; text-align:center;
+    background:#fff; border:1px solid var(--azul-borde);
+    border-radius:22px; padding:34px 26px 28px;
+    box-shadow:0 8px 24px rgba(22,48,92,0.1);
+  }
+  .lock-box .lock-logo{
+    width:84px; height:84px; border-radius:20px;
+    overflow:hidden;
+    margin:0 auto 20px;
+    box-shadow:0 4px 14px rgba(22,48,92,0.22);
+  }
+  .lock-box .lock-logo img{
+    width:100%; height:100%; object-fit:cover; display:block;
+  }
+  .lock-box h2{
+    color:#111624; font-size:23px; margin:0 0 6px; font-weight:800;
+  }
+  .lock-box p{
+    color:var(--azul-osc); font-size:15.5px; font-weight:600; margin:0 0 24px;
+  }
+  #google-btn-container{ justify-content:center; margin-bottom:14px; min-height:44px; }
+  .lock-box .login-error{
+    color:var(--rojo); font-size:14px; font-weight:600; margin-top:14px; min-height:16px;
+  }
+  .lock-box .login-checking{
+    color:var(--texto-tenue); font-size:14px; margin-top:6px; min-height:44px;
+  }
 </style>
 </head>
 <body>
 
 <div id="login-screen">
-  <h1>Clientes</h1>
-  <div class="sub">Distribuidora Don Picconi</div>
-  <div id="login-checking" class="login-checking">Verificando sesión...</div>
-  <div id="google-btn-container" style="display:none;"></div>
-  <div class="login-error" id="login-error"></div>
+  <div class="lock-box">
+    <div class="lock-logo"><img src="icon-192.png" alt="Clientes"></div>
+    <h2>Clientes</h2>
+    <p>Distribuidora Don Picconi</p>
+    <div id="login-checking" class="login-checking">Verificando sesión...</div>
+    <div id="google-btn-container" style="display:none;"></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
 </div>
 
 <div id="confirm-eliminar-modal" class="hidden">
@@ -565,7 +604,7 @@
       </div>
 
       <label for="nm-notas">Notas</label>
-      <textarea id="nm-notas" rows="2" placeholder="Notas (opcional)"></textarea>
+      <textarea id="nm-notas" rows="1" placeholder="Notas (opcional)"></textarea>
 
       <label for="nm-email">Usuario</label>
       <input type="text" id="nm-email" readonly>
@@ -667,6 +706,7 @@
 
   <div class="search-wrap" id="search-wrap">
     <input type="text" id="search" placeholder="Buscar...">
+    <div class="chips-rapidos hidden" id="chips-rapidos"></div>
   </div>
 
   <main id="main">
@@ -729,7 +769,7 @@ function mostrarLogin(){
   document.getElementById('app').style.display = 'none';
   loginScreen.classList.remove('hidden');
   loginChecking.style.display = 'none';
-  googleBtnContainer.style.display = 'block';
+  googleBtnContainer.style.display = 'flex';
 }
 
 function ocultarLogin(){
@@ -748,7 +788,7 @@ function manejarCredencial(response){
   const credencial = firebase.auth.GoogleAuthProvider.credential(response.credential);
   auth.signInWithCredential(credencial).catch(err => {
     loginChecking.style.display = 'none';
-    googleBtnContainer.style.display = 'block';
+    googleBtnContainer.style.display = 'flex';
     loginError.textContent = 'No se pudo iniciar sesión: ' + err.message;
   });
 }
@@ -764,7 +804,7 @@ function iniciarLogin(){
     callback: manejarCredencial
   });
   google.accounts.id.renderButton(googleBtnContainer, {
-    type: 'standard', size: 'large', theme: 'filled_blue', text: 'signin_with', shape: 'pill'
+    theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', width: 260
   });
 }
 
@@ -1100,12 +1140,14 @@ let movimientos = [];
 let clientes = [];
 let revisiones = [];
 let currentTab = 'clientes';
+let repartoRapido = '';   // filtro rápido por Reparto (botones bajo el buscador, solo en Movimientos)
 let miRol = null; // 'admin', 'colaborador' o 'visitante', lo manda el servidor en cada carga
 let miEmail = null; // email de Google de quien está logueado, para el campo "Cargado por"
 
 const mainEl = document.getElementById('main');
 const searchEl = document.getElementById('search');
 const searchWrapEl = document.getElementById('search-wrap');
+const chipsRapidosEl = document.getElementById('chips-rapidos');
 const headerTitle = document.getElementById('header-title');
 const btnRefresh = document.getElementById('btn-refresh');
 const btnCompartir = document.getElementById('btn-compartir');
@@ -1336,6 +1378,7 @@ function renderMovimientos(filtro){
 
   const filas = ordenados
     .filter(mov => {
+      if(repartoRapido && mov['Reparto'] !== repartoRapido) return false;
       if(!filtro) return true;
       const texto = `${mov['Cliente']||''} ${mov['Reparto']||''}`.toLowerCase();
       return texto.includes(filtro.toLowerCase());
@@ -1547,6 +1590,7 @@ function restaurarScroll(){
 
 function render(){
   const filtro = searchEl.value.trim();
+  chipsRapidosEl.classList.toggle('hidden', currentTab !== 'movimientos');
   mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
   mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes' || currentTab === 'revision');
   fabNuevo.classList.toggle('hidden', miRol === 'visitante');
@@ -1599,6 +1643,24 @@ btnRefresh.addEventListener('click', cargarDatos);
 searchEl.addEventListener('input', () => {
   scrollState.clientes = 0;
   scrollState.movimientos = { top: 0, left: 0 };
+  render();
+});
+
+// Botones fijos bajo el buscador (solo en Movimientos): filtran por Reparto con un
+// toque. Tocar el botón activo lo desactiva. Se combinan con lo escrito en el buscador.
+chipsRapidosEl.innerHTML = CONFIG.REPARTOS.map(r =>
+  `<button type="button" class="chip-rapido" data-rep="${r}">${r}</button>`).join('');
+function marcarChipsReparto(){
+  chipsRapidosEl.querySelectorAll('.chip-rapido').forEach(b =>
+    b.classList.toggle('active', b.dataset.rep === repartoRapido));
+}
+chipsRapidosEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.chip-rapido');
+  if(!btn) return;
+  repartoRapido = (repartoRapido === btn.dataset.rep) ? '' : btn.dataset.rep;
+  marcarChipsReparto();
+  deseleccionarFila();
+  irAlFondoMovimientos = true;   // queda abajo del todo (último cargado)
   render();
 });
 
@@ -2108,6 +2170,8 @@ fabCopiar.addEventListener('click', () => {
     deseleccionarFila();
     if(nombre){
       setTab('movimientos');
+      repartoRapido = '';
+      marcarChipsReparto();
       searchEl.value = nombre;
       render();
     }
