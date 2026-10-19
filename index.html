@@ -386,6 +386,7 @@
   .nuevo-body textarea:focus{ border-color:var(--azul); }
   /* Notas: ancho completo, sin poder agrandarla a mano y con la misma altura que Importe/Entregó */
   #nm-notas, #nm-importe, #nm-entrego{ height:46px; }
+  #nr-motivo{ resize:none; }
   #nm-notas{ resize:none; line-height:20px; overflow-y:auto; }
 
   .nm-reparto-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -570,7 +571,7 @@
         </div>
         <div>
           <label for="nm-cliente">Cliente</label>
-          <input type="text" id="nm-cliente" placeholder="Ej: Fernanda" list="lista-clientes" autocomplete="off">
+          <input type="text" id="nm-cliente" maxlength="30" placeholder="Ej: Fernanda" list="lista-clientes" autocomplete="off">
         </div>
       </div>
       <datalist id="lista-clientes"></datalist>
@@ -604,7 +605,7 @@
       </div>
 
       <label for="nm-notas">Notas</label>
-      <textarea id="nm-notas" rows="1" placeholder="Notas (opcional)"></textarea>
+      <textarea id="nm-notas" rows="1" maxlength="30" placeholder="Notas (opcional)"></textarea>
 
       <label for="nm-email">Usuario</label>
       <input type="text" id="nm-email" readonly>
@@ -627,7 +628,7 @@
       <input type="hidden" id="nc-nombre-original">
 
       <label>Nombre</label>
-      <input type="text" id="nc-nombre" placeholder="Ej: Fernanda" autocomplete="off">
+      <input type="text" id="nc-nombre" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off">
 
       <label>Reparto</label>
       <div class="nm-reparto-grid" id="nc-reparto-grid"></div>
@@ -666,7 +667,7 @@
       <input type="hidden" id="nr-reparto">
 
       <label for="nr-motivo">Motivo</label>
-      <textarea id="nr-motivo" rows="3" placeholder="Motivo de la revisión"></textarea>
+      <textarea id="nr-motivo" rows="3" maxlength="175" placeholder="Motivo de la revisión"></textarea>
     </div>
     <div class="nuevo-error" id="nr-error"></div>
     <div class="nuevo-footer">
