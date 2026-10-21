@@ -2259,7 +2259,10 @@ function liberarLockActivo(){
 // búsqueda en vez de pegado abajo de la pantalla, y limita su alto
 // para que no se salga de la pantalla.
 function posicionarNuevoBox(box){
-  const offset = Math.round(searchWrapEl.getBoundingClientRect().bottom) + 10;
+  // La ventana arranca justo debajo de las 3 pestañas principales,
+  // tapando el buscador (y los chips de filtro) de cada pestaña.
+  const tabsEl = document.querySelector('.pill-tabs');
+  const offset = Math.round(tabsEl.getBoundingClientRect().bottom) + 10;
   box.style.marginTop = offset + 'px';
   box.style.maxHeight = `calc(100vh - ${offset}px - 16px)`;
 }
