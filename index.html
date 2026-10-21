@@ -594,12 +594,12 @@
       <div class="nm-fecha-cliente-grid">
         <div>
           <label for="nm-fecha">Fecha</label>
-          <input type="date" id="nm-fecha">
+          <input type="date" id="nm-fecha" autocomplete="off" name="dp_nm_fecha_x">
         </div>
         <div>
           <label for="nm-cliente">Cliente</label>
           <div class="combo" id="combo-cliente">
-            <input type="text" id="nm-cliente" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off" autocapitalize="words" role="combobox" aria-expanded="false" aria-controls="combo-clientes-lista">
+            <input type="text" id="nm-cliente" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off" autocapitalize="words" role="combobox" aria-expanded="false" aria-controls="combo-clientes-lista" name="dp_nm_cliente_x">
             <button type="button" class="combo-toggle" id="combo-toggle" tabindex="-1" aria-label="Ver clientes">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
@@ -611,36 +611,36 @@
       <div class="nuevo-importes-grid nm-saldos-grid">
         <div>
           <label for="nm-reparto">Reparto</label>
-          <input type="text" id="nm-reparto" readonly>
+          <input type="text" id="nm-reparto" readonly autocomplete="off" name="dp_nm_reparto_x">
         </div>
         <div>
           <label for="nm-saldo-anterior">Saldo anterior</label>
-          <input type="text" id="nm-saldo-anterior" readonly>
+          <input type="text" id="nm-saldo-anterior" readonly autocomplete="off" name="dp_nm_saldo_anterior_x">
         </div>
         <div class="nm-reparto-hint" id="nm-reparto-hint"></div>
         <div>
           <label for="nm-importe">Importe</label>
-          <input type="text" inputmode="decimal" id="nm-importe" placeholder="$0">
+          <input type="text" inputmode="decimal" id="nm-importe" placeholder="$0" autocomplete="off" name="dp_nm_importe_x">
         </div>
         <div>
           <label for="nm-entrego">Entregó</label>
-          <input type="text" inputmode="decimal" id="nm-entrego" placeholder="$0">
+          <input type="text" inputmode="decimal" id="nm-entrego" placeholder="$0" autocomplete="off" name="dp_nm_entrego_x">
         </div>
         <div>
           <label for="nm-saldo">Saldo</label>
-          <input type="text" id="nm-saldo" readonly>
+          <input type="text" id="nm-saldo" readonly autocomplete="off" name="dp_nm_saldo_x">
         </div>
         <div>
           <label for="nm-saldo-acumulado">Saldo acumulado</label>
-          <input type="text" id="nm-saldo-acumulado" readonly>
+          <input type="text" id="nm-saldo-acumulado" readonly autocomplete="off" name="dp_nm_saldo_acumulado_x">
         </div>
       </div>
 
       <label for="nm-notas">Notas</label>
-      <textarea id="nm-notas" rows="1" maxlength="30" placeholder="Notas (opcional)"></textarea>
+      <textarea id="nm-notas" rows="1" maxlength="30" placeholder="Notas (opcional)" autocomplete="off" name="dp_nm_notas_x"></textarea>
 
       <label for="nm-email">Usuario</label>
-      <input type="text" id="nm-email" readonly>
+      <input type="text" id="nm-email" readonly autocomplete="off" name="dp_nm_email_x">
     </div>
     <div class="nuevo-error" id="nuevo-error"></div>
     <div class="nuevo-footer">
@@ -660,7 +660,7 @@
       <input type="hidden" id="nc-nombre-original">
 
       <label>Nombre</label>
-      <input type="text" id="nc-nombre" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off">
+      <input type="text" id="nc-nombre" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off" name="dp_nc_nombre_x">
 
       <label>Reparto</label>
       <div class="nm-reparto-grid" id="nc-reparto-grid"></div>
@@ -686,11 +686,11 @@
       <div class="nm-fecha-cliente-grid">
         <div>
           <label for="nr-fecha-revision">Fecha revisión</label>
-          <input type="date" id="nr-fecha-revision">
+          <input type="date" id="nr-fecha-revision" autocomplete="off" name="dp_nr_fecha_revision_x">
         </div>
         <div>
           <label for="nr-fecha-reparto">Fecha reparto</label>
-          <input type="date" id="nr-fecha-reparto">
+          <input type="date" id="nr-fecha-reparto" autocomplete="off" name="dp_nr_fecha_reparto_x">
         </div>
       </div>
 
@@ -699,7 +699,7 @@
       <input type="hidden" id="nr-reparto">
 
       <label for="nr-motivo">Motivo</label>
-      <textarea id="nr-motivo" rows="3" maxlength="175" placeholder="Motivo de la revisión"></textarea>
+      <textarea id="nr-motivo" rows="3" maxlength="175" placeholder="Motivo de la revisión" autocomplete="off" name="dp_nr_motivo_x"></textarea>
     </div>
     <div class="nuevo-error" id="nr-error"></div>
     <div class="nuevo-footer">
@@ -738,7 +738,7 @@
   </div>
 
   <div class="search-wrap" id="search-wrap">
-    <input type="text" id="search" placeholder="Buscar...">
+    <input type="text" id="search" placeholder="Buscar..." autocomplete="off" name="dp_search_x">
     <div class="chips-rapidos hidden" id="chips-rapidos"></div>
   </div>
 
