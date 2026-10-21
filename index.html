@@ -377,6 +377,33 @@
     background:#fff; font-size:16px; outline:none; color:#1a1f2b;
   }
   .nuevo-body input:focus{ border-color:var(--azul); }
+  /* Lista desplegable de clientes (campo escribible + sugerencias filtradas) */
+  .combo{ position:relative; }
+  .nuevo-body .combo input[type="text"]{ padding-left:38px; padding-right:38px; }
+  .combo-toggle{
+    position:absolute; top:0; right:0; height:100%; width:38px; border:none; background:none;
+    color:var(--texto-tenue); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+  .combo-toggle svg{ width:18px; height:18px; transition:transform .15s ease; }
+  .combo.abierto .combo-toggle{ color:var(--azul); }
+  .combo.abierto .combo-toggle svg{ transform:rotate(180deg); }
+  .combo.abierto input{ border-color:var(--azul); }
+  .combo-list{
+    position:absolute; z-index:20; top:calc(100% + 6px); right:0;
+    min-width:100%; width:max-content; max-width:min(320px, calc(100vw - 64px));
+    max-height:232px; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+    margin:0; padding:5px; list-style:none;
+    background:#fff; border:1px solid var(--azul-borde); border-radius:12px;
+    box-shadow:0 10px 26px rgba(17,22,36,0.18);
+  }
+  .combo-list[hidden]{ display:none; }
+  .combo-list li{
+    padding:11px 12px; border-radius:8px; font-size:15.5px; font-weight:600; color:#1a1f2b;
+    cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .combo-list li b{ font-weight:800; color:var(--azul); }
+  .combo-list li.activo{ background:var(--azul-suave); color:var(--azul-osc); }
+  .combo-list li.vacio{ color:var(--texto-tenue); font-weight:500; font-size:14px; cursor:default; white-space:normal; }
   .nuevo-body input[readonly]{ background:#f4f7fc; color:var(--texto-tenue); }
   .nuevo-body textarea{
     display:block; width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--azul-borde);
@@ -571,10 +598,15 @@
         </div>
         <div>
           <label for="nm-cliente">Cliente</label>
-          <input type="text" id="nm-cliente" maxlength="30" placeholder="Ej: Fernanda" list="lista-clientes" autocomplete="off">
+          <div class="combo" id="combo-cliente">
+            <input type="text" id="nm-cliente" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off" autocapitalize="words" role="combobox" aria-expanded="false" aria-controls="combo-clientes-lista">
+            <button type="button" class="combo-toggle" id="combo-toggle" tabindex="-1" aria-label="Ver clientes">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <ul class="combo-list" id="combo-clientes-lista" role="listbox" hidden></ul>
+          </div>
         </div>
       </div>
-      <datalist id="lista-clientes"></datalist>
 
       <div class="nuevo-importes-grid nm-saldos-grid">
         <div>
@@ -1544,11 +1576,12 @@ function renderRevision(filtro){
   renderRevisionAgrupada(lista, 'Sin revisiones que coincidan.');
 }
 
+// La lista del campo Cliente del formulario de movimientos se arma al
+// momento de mostrarla (ver "Combo de clientes" más abajo), así que acá
+// no hay nada que precalcular; se deja la función porque la llaman al
+// cargar los datos.
 function actualizarListaClientes(){
-  const nombres = clientes.map(c => String(c['Cliente']||'').trim()).filter(Boolean)
-    .sort((a,b) => a.localeCompare(b, 'es'));
-  document.getElementById('lista-clientes').innerHTML =
-    nombres.map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
+  if(typeof comboRender_ === 'function' && comboAbierto_()) comboRender_();
 }
 
 /* ============== Scroll / tabs ============== */
@@ -1998,6 +2031,110 @@ function actualizarSaldosPreview(){
 
 nmCliente.addEventListener('input', actualizarRepartoSegunCliente);
 nmCliente.addEventListener('input', actualizarSaldosPreview);
+
+/* ============== Combo de clientes (escribir + lista filtrada) ============== */
+const comboWrap = document.getElementById('combo-cliente');
+const comboLista = document.getElementById('combo-clientes-lista');
+const comboToggle = document.getElementById('combo-toggle');
+let comboIdx_ = -1;
+let comboItems_ = [];
+
+function normBusqueda_(t){
+  return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+function escHtmlCombo_(t){
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function comboAbierto_(){ return !comboLista.hidden; }
+
+function comboRender_(){
+  const nombres = clientes.map(c => String(c['Cliente'] || '').trim()).filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'es'));
+  const texto = nmCliente.value.trim();
+  const q = normBusqueda_(texto);
+  // Si lo escrito ya es un cliente exacto (p.ej. al editar), se muestran
+  // todos para poder cambiarlo; si no, se filtra por lo tipeado.
+  const exacto = q && nombres.some(n => normBusqueda_(n) === q);
+  let lista = (!q || exacto) ? nombres : nombres.filter(n => normBusqueda_(n).includes(q));
+  if(q && !exacto){
+    // Primero los que empiezan con lo escrito, después los que lo contienen.
+    lista = lista.filter(n => normBusqueda_(n).startsWith(q))
+      .concat(lista.filter(n => !normBusqueda_(n).startsWith(q)));
+  }
+  comboItems_ = lista;
+  comboIdx_ = -1;
+
+  if(!lista.length){
+    comboLista.innerHTML = '<li class="vacio">Ningún cliente coincide. Si es nuevo, agregalo desde la pestaña Clientes.</li>';
+    return;
+  }
+  comboLista.innerHTML = lista.map((n, i) => {
+    let html = escHtmlCombo_(n);
+    if(q && !exacto){
+      const pos = normBusqueda_(n).indexOf(q);
+      // normBusqueda_ puede cambiar el largo si hay tildes combinadas; solo
+      // resaltamos cuando los largos coinciden.
+      if(pos >= 0 && normBusqueda_(n).length === n.length){
+        html = escHtmlCombo_(n.slice(0, pos)) + '<b>' + escHtmlCombo_(n.slice(pos, pos + q.length)) + '</b>' + escHtmlCombo_(n.slice(pos + q.length));
+      }
+    }
+    return '<li role="option" data-i="' + i + '">' + html + '</li>';
+  }).join('');
+}
+
+function comboAbrir_(){
+  comboRender_();
+  comboLista.hidden = false;
+  comboWrap.classList.add('abierto');
+  nmCliente.setAttribute('aria-expanded', 'true');
+}
+function comboCerrar_(){
+  comboLista.hidden = true;
+  comboWrap.classList.remove('abierto');
+  nmCliente.setAttribute('aria-expanded', 'false');
+  comboIdx_ = -1;
+}
+function comboMarcar_(i){
+  const lis = comboLista.querySelectorAll('li[data-i]');
+  if(!lis.length) return;
+  comboIdx_ = (i + lis.length) % lis.length;
+  lis.forEach((li, k) => li.classList.toggle('activo', k === comboIdx_));
+  lis[comboIdx_].scrollIntoView({ block: 'nearest' });
+}
+function comboElegir_(nombre){
+  nmCliente.value = nombre;
+  // Dispara los mismos handlers que cuando se tipea (Reparto + saldos).
+  nmCliente.dispatchEvent(new Event('input', { bubbles: true }));
+  comboCerrar_();
+  nmImporte.focus();
+}
+
+nmCliente.addEventListener('focus', comboAbrir_);
+nmCliente.addEventListener('click', () => { if(!comboAbierto_()) comboAbrir_(); });
+nmCliente.addEventListener('input', () => { if(!comboAbierto_()) comboAbrir_(); else comboRender_(); });
+nmCliente.addEventListener('keydown', e => {
+  if(e.key === 'ArrowDown'){ e.preventDefault(); if(!comboAbierto_()) comboAbrir_(); comboMarcar_(comboIdx_ + 1); }
+  else if(e.key === 'ArrowUp'){ e.preventDefault(); if(comboAbierto_()) comboMarcar_(comboIdx_ - 1); }
+  else if(e.key === 'Enter'){
+    if(comboAbierto_() && comboIdx_ >= 0){ e.preventDefault(); comboElegir_(comboItems_[comboIdx_]); }
+    else if(comboAbierto_() && comboItems_.length === 1 && normBusqueda_(nmCliente.value)){ e.preventDefault(); comboElegir_(comboItems_[0]); }
+  }
+  else if(e.key === 'Escape' && comboAbierto_()){ e.stopPropagation(); comboCerrar_(); }
+  else if(e.key === 'Tab'){ comboCerrar_(); }
+});
+nmCliente.addEventListener('blur', () => { setTimeout(comboCerrar_, 120); });
+
+// mousedown con preventDefault: evita que el input pierda el foco antes
+// de registrar el toque en una opción o en la flechita.
+[comboLista, comboToggle].forEach(el => el.addEventListener('mousedown', e => e.preventDefault()));
+comboLista.addEventListener('click', e => {
+  const li = e.target.closest('li[data-i]');
+  if(li) comboElegir_(comboItems_[parseInt(li.dataset.i, 10)]);
+});
+comboToggle.addEventListener('click', () => {
+  if(comboAbierto_()){ comboCerrar_(); }
+  else { nmCliente.focus(); comboAbrir_(); }
+});
 nmFecha.addEventListener('input', actualizarSaldosPreview);
 nmFecha.addEventListener('change', actualizarSaldosPreview);
 [nmImporte, nmEntrego].forEach(inp => inp.addEventListener('input', actualizarSaldosPreview));
@@ -2055,6 +2192,7 @@ function abrirNuevoModal(mov, modoEditar){
   nmEmail.value = (precargar && modoEditar && mov['Usuario']) ? mov['Usuario'] : (miEmail || '');
   nmNotas.value = precargar ? (mov['Notas'] || '') : '';
 
+  comboCerrar_();
   nuevoError.textContent = '';
   btnGuardar.disabled = false;
   btnGuardar.textContent = modoEditar ? 'Guardar cambios' : (precargar ? 'Guardar copia' : 'Guardar');
@@ -2064,6 +2202,7 @@ function abrirNuevoModal(mov, modoEditar){
 }
 
 function cerrarNuevoModal(){
+  comboCerrar_();
   nuevoModal.classList.add('hidden');
   liberarLockActivo();
 }
