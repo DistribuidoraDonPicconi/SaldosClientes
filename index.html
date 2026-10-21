@@ -391,19 +391,19 @@
   .combo-list{
     position:absolute; z-index:20; top:calc(100% + 6px); right:0;
     min-width:100%; width:max-content; max-width:min(320px, calc(100vw - 64px));
-    max-height:232px; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+    max-height:130px; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
     margin:0; padding:5px; list-style:none;
     background:#fff; border:1px solid var(--azul-borde); border-radius:12px;
     box-shadow:0 10px 26px rgba(17,22,36,0.18);
   }
   .combo-list[hidden]{ display:none; }
   .combo-list li{
-    padding:11px 12px; border-radius:8px; font-size:15.5px; font-weight:600; color:#1a1f2b;
+    box-sizing:border-box; height:40px; line-height:20px; padding:10px 12px; border-radius:8px; font-size:15.5px; font-weight:600; color:#1a1f2b;
     cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   .combo-list li b{ font-weight:800; color:var(--azul); }
   .combo-list li.activo{ background:var(--azul-suave); color:var(--azul-osc); }
-  .combo-list li.vacio{ color:var(--texto-tenue); font-weight:500; font-size:14px; cursor:default; white-space:normal; }
+  .combo-list li.vacio{ color:var(--texto-tenue); font-weight:500; font-size:14px; cursor:default; white-space:normal; height:auto; line-height:1.35; }
   .nuevo-body input[readonly]{ background:#f4f7fc; color:var(--texto-tenue); }
   .nuevo-body textarea{
     display:block; width:100%; padding:12px 13px; border-radius:12px; border:1px solid var(--azul-borde);
