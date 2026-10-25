@@ -1901,6 +1901,9 @@ function armarTextoSaldos_(lista){
   lineas.push('*SALDOS DE CLIENTES*');
   lineas.push('Distribuidora Don Picconi');
   lineas.push(new Date().toLocaleDateString('es-AR'));
+  lineas.push('');
+  lineas.push('*TOTAL GENERAL*');
+  lineas.push(`*${formatMoneda(total)}*`);
 
   categorias.forEach(cat => {
     const items = grupos[cat].slice().sort((a, b) =>
@@ -1910,20 +1913,18 @@ function armarTextoSaldos_(lista){
 
     lineas.push('');
     lineas.push(`━━━━━━━━━━━━━━`);
-    lineas.push(`*${cat.toUpperCase()}* (${items.length}) · *${formatMoneda(subtotal)}*`);
+    lineas.push(`*${cat.toUpperCase()}* (${items.length})`);
+    lineas.push(`*${formatMoneda(subtotal)}*`);
     lineas.push(`━━━━━━━━━━━━━━`);
     items.forEach(c => {
       // Fecha del último movimiento, y debajo el cliente con su saldo.
       const f = formatFecha(c.fecha);
       const fechaCorta = f.length === 10 ? f.slice(0, 6) + f.slice(8) : f;
-      lineas.push('');
-      lineas.push(`_${fechaCorta}_`);
-      lineas.push(`${c.nombre}: *${formatMoneda(c.saldo)}*`);
+      lineas.push(`• _${fechaCorta}_`);
+      lineas.push(`  ${c.nombre}: *${formatMoneda(c.saldo)}*`);
     });
   });
 
-  lineas.push('');
-  lineas.push(`*TOTAL: ${formatMoneda(total)}*`);
   return lineas.join('\n');
 }
 
@@ -1938,7 +1939,7 @@ function abrirCompartirTexto(){
   }
   textoSaldosActual = armarTextoSaldos_(ultimaListaClientesVisible);
   // En la vista previa se ocultan los marcadores de WhatsApp (* y ```).
-  textoPreview.textContent = textoSaldosActual.replace(/\*/g, '').replace(/(^|\n)_([^_\n]+)_/g, '$1$2');
+  textoPreview.textContent = textoSaldosActual.replace(/\*/g, '').replace(/_([0-9\/\-]+)_/g, '$1');
   compartirTextoModal.classList.remove('hidden');
 }
 
