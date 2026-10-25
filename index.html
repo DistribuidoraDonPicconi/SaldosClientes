@@ -338,8 +338,8 @@
   .texto-preview{
     width:100%; max-height:320px; overflow:auto; text-align:left;
     border:1px solid var(--linea); border-radius:12px; margin:0 0 16px; padding:12px;
-    background:#f7f9fd; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    font-size:12.5px; line-height:1.45; white-space:pre; color:#1a1f2b;
+    background:#f7f9fd; font-family:inherit;
+    font-size:13.5px; line-height:1.45; white-space:pre-wrap; color:#1a1f2b;
   }
   .fab-accion.editar{ background:#5f8fe0; box-shadow:0 6px 16px rgba(95,143,224,0.4); }
   .fab-accion.eliminar{ background:#f0908d; box-shadow:0 6px 16px rgba(240,144,141,0.4); }
@@ -1909,15 +1909,17 @@ function armarTextoSaldos_(lista){
     const anchoNombre = Math.min(MAX_NOMBRE, Math.max(...items.map(c => c.nombre.length)));
 
     lineas.push('');
-    lineas.push(`*${cat.toUpperCase()}* (${items.length}) · ${formatMoneda(subtotal)}`);
-    lineas.push('```');
+    lineas.push(`━━━━━━━━━━━━━━`);
+    lineas.push(`*${cat.toUpperCase()}* (${items.length}) · *${formatMoneda(subtotal)}*`);
+    lineas.push(`━━━━━━━━━━━━━━`);
     items.forEach(c => {
-      // Fecha corta dd/mm/aa del último movimiento (en el mismo orden que la tabla).
+      // Fecha del último movimiento, y debajo el cliente con su saldo.
       const f = formatFecha(c.fecha);
       const fechaCorta = f.length === 10 ? f.slice(0, 6) + f.slice(8) : f;
-      lineas.push(fechaCorta.padEnd(8, ' ') + '  ' + recortar(c.nombre).padEnd(anchoNombre, ' ') + '  ' + formatMoneda(c.saldo).padStart(anchoMonto, ' '));
+      lineas.push('');
+      lineas.push(`_${fechaCorta}_`);
+      lineas.push(`${c.nombre}: *${formatMoneda(c.saldo)}*`);
     });
-    lineas.push('```');
   });
 
   lineas.push('');
@@ -1936,7 +1938,7 @@ function abrirCompartirTexto(){
   }
   textoSaldosActual = armarTextoSaldos_(ultimaListaClientesVisible);
   // En la vista previa se ocultan los marcadores de WhatsApp (* y ```).
-  textoPreview.textContent = textoSaldosActual.replace(/```\n?/g, '').replace(/\*/g, '');
+  textoPreview.textContent = textoSaldosActual.replace(/\*/g, '').replace(/(^|\n)_([^_\n]+)_/g, '$1$2');
   compartirTextoModal.classList.remove('hidden');
 }
 
