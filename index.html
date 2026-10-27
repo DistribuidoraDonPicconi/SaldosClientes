@@ -112,6 +112,8 @@
     width:100%; padding:11px 13px; border-radius:11px; border:1px solid var(--azul-borde);
     background:#fff; font-size:16px; outline:none; color:#1a1f2b;
   }
+  .search-wrap input.hidden{ display:none; }
+  .search-wrap input.hidden + .chips-rapidos{ margin-top:0; }
   .search-wrap input:focus{ border-color:var(--azul); }
   .search-wrap input::placeholder{ color:#a7b2c6; }
   .chips-rapidos{ display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
@@ -171,8 +173,18 @@
   table.clientes tr.cliente-row.selected td.nombre{ color:var(--azul-osc); }
 
   /* Cabeceras de grupo por Reparto (acordeón contraíble) */
-  table.clientes tr.categoria-row td{ background:var(--fondo); border-top:1px solid var(--linea); border-bottom:1px solid var(--linea); padding-top:14px; padding-bottom:9px; }
-  table.clientes tr.categoria-row td.nombre{ font-size:13px; font-weight:800; color:var(--azul); text-transform:uppercase; letter-spacing:0.4px; }
+  table.clientes tr.categoria-row td{ background:#e9eff9; border-top:1px solid var(--azul-borde); border-bottom:1px solid var(--azul-borde); padding-top:16px; padding-bottom:12px; }
+  table.clientes tr.categoria-row td.nombre{ font-size:14px; font-weight:800; color:var(--azul-osc); text-transform:uppercase; letter-spacing:0.5px; border-left:4px solid var(--azul); }
+  /* Más aire entre un reparto y el siguiente */
+  table.clientes tbody.grupo-body{ border-top:0; }
+  table.clientes tbody.grupo-body + tbody.grupo-body tr.categoria-row td{ border-top:14px solid var(--fondo); }
+  table.clientes tbody.grupo-body tr.categoria-row td.saldo{ background:#e9eff9; }
+  /* Subtítulos de sección (Clientes con saldo / sin saldo) */
+  table.clientes tbody.seccion-sep td{ height:22px; padding:0; background:var(--fondo); border:none; }
+  table.clientes tr.seccion-row td{ background:var(--azul-osc); color:#fff; padding:14px 12px; font-size:15px; font-weight:800; letter-spacing:0.4px; text-align:left; border:none; }
+  table.clientes tr.seccion-row td.nombre{ color:#fff; text-align:left; font-size:15px; }
+  table.clientes tr.seccion-row td.saldo{ color:#fff; font-size:15px; text-align:center; }
+  table.clientes tr.seccion-row .seccion-count{ font-weight:600; font-size:12.5px; opacity:.75; }
   table.clientes tr.categoria-row td.saldo{ font-size:14.5px; font-weight:700; color:#1a1f2b; }
   table.clientes tr.categoria-row td.saldo.pos{ color:var(--rojo); }
   table.clientes tr.categoria-row td.saldo.zero{ color:#9aa5ba; font-weight:600; }
@@ -1207,6 +1219,7 @@ let movimientos = [];
 let clientes = [];
 let revisiones = [];
 let currentTab = 'clientes';
+let repartoRevision = ''; // filtro por Reparto de la pestaña Revisión (botones, sin buscador)
 let repartoRapido = '';   // filtro rápido por Reparto (botones bajo el buscador, solo en Movimientos)
 let miRol = null; // 'admin', 'colaborador' o 'visitante', lo manda el servidor en cada carga
 let miEmail = null; // email de Google de quien está logueado, para el campo "Cargado por"
@@ -1304,14 +1317,18 @@ async function cargarDatos(){
 }
 
 /* ============== Pestaña Clientes (lista maestra + saldo) ============== */
-// Los clientes con saldo $0 quedan ocultos siempre por defecto (ya no hay
-// botón para alternarlo).
-let ocultarSinSaldo = true;
 let ultimaListaClientesVisible = [];
-// Categorías de reparto colapsadas en la pestaña Clientes (persiste
-// mientras la app queda abierta; al recargar vuelven a estar todas
-// desplegadas).
-let categoriasColapsadas = new Set();
+
+// Estado de plegado de cada grupo de la pestaña Clientes. La clave es
+// "con|Reparto 1" o "sin|Reparto 1" (sección + reparto). Si el usuario
+// no tocó un grupo, rige el valor por defecto: los de "Clientes con
+// saldo" quedan desplegados y los de "Clientes sin saldo" plegados.
+// Persiste mientras la app queda abierta.
+const colapsoClientes = new Map();
+function estaColapsadoCliente_(clave){
+  if(colapsoClientes.has(clave)) return colapsoClientes.get(clave);
+  return clave.startsWith('sin|');
+}
 
 function calcularSaldosClientes(){
   return clientes
@@ -1324,62 +1341,91 @@ function calcularSaldosClientes(){
     .filter(c => c.nombre);
 }
 
-// Agrupa los clientes en
+// Arma la pestaña Clientes en dos secciones: "Clientes con saldo" y
+// "Clientes sin saldo". Dentro de cada una, los clientes se agrupan en
 // solapas contraíbles por Reparto (orden fijo de CONFIG.REPARTOS,
-// "Sin reparto" al final), con los clientes de cada grupo ordenados
-// alfabéticamente. El estado de qué grupos están colapsados vive en
-// categoriasColapsadas y se ignora mientras hay una búsqueda activa,
-// para que los resultados filtrados siempre queden visibles.
+// "Sin reparto" al final). Mientras hay una búsqueda activa se ignora el
+// plegado, para que los resultados filtrados siempre queden visibles.
 function renderTablaClientesAgrupada(lista, mensajeVacio){
-  ultimaListaClientesVisible = lista;
+  const esCero = c => Math.round((c.saldo + Number.EPSILON) * 100) / 100 === 0;
+  const conSaldo = lista.filter(c => !esCero(c));
+  const sinSaldo = lista.filter(esCero);
+
+  // El texto para compartir por WhatsApp solo incluye a los clientes con saldo.
+  ultimaListaClientesVisible = conSaldo;
 
   if(!lista.length){
     mainEl.innerHTML = `<div class="state-msg">${mensajeVacio}</div>`;
     return;
   }
 
-  const totalGeneral = lista.reduce((acc, c) => acc + c.saldo, 0);
+  const totalGeneral = conSaldo.reduce((acc, c) => acc + c.saldo, 0);
   const claseTotal = totalGeneral > 0 ? 'pos' : (totalGeneral < 0 ? 'neg' : 'zero');
   const filaTotal = `<tr class="total-row">
     <td class="nombre" colspan="3">Total</td>
     <td class="saldo ${claseTotal}">${formatMoneda(totalGeneral)}</td>
   </tr>`;
 
-  const grupos = {};
-  lista.forEach(c => {
-    const cat = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
-    (grupos[cat] = grupos[cat] || []).push(c);
-  });
-  const categorias = [...CONFIG.REPARTOS, 'Sin reparto'].filter(cat => grupos[cat] && grupos[cat].length);
   const hayBusqueda = !!searchEl.value.trim();
+  const fechaNum = c => fechaComparable_(c.fecha) || 0;
 
-  const bloques = categorias.map(cat => {
-    const items = grupos[cat].slice().sort((a,b) =>
-      fechaComparable_(a.fecha) - fechaComparable_(b.fecha) || a.nombre.localeCompare(b.nombre, 'es')
-    );
-    const subtotal = items.reduce((acc, c) => acc + c.saldo, 0);
-    const claseSubtotal = subtotal > 0 ? 'pos' : (subtotal < 0 ? 'neg' : 'zero');
-    const colapsado = categoriasColapsadas.has(cat) && !hayBusqueda;
+  function armarSeccion(seccion, items, titulo){
+    if(!items.length) return '';
 
-    const filas = items.map(c => {
-      const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
-      const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
-      return `<tr class="cliente-row" data-cliente="${c.nombre.replace(/"/g,'&quot;')}">
-        <td class="fecha">${formatFecha(c.fecha)}</td>
-        <td class="nombre">${c.nombre}</td>
-        <td class="reparto">${c.reparto || '-'}</td>
-        <td class="saldo ${cls}">${formatMoneda(c.saldo)}</td>
-      </tr>`;
+    const grupos = {};
+    items.forEach(c => {
+      const cat = c.reparto && CONFIG.REPARTOS.includes(c.reparto) ? c.reparto : 'Sin reparto';
+      (grupos[cat] = grupos[cat] || []).push(c);
+    });
+    const categorias = [...CONFIG.REPARTOS, 'Sin reparto'].filter(cat => grupos[cat] && grupos[cat].length);
+
+    const subtotalSeccion = items.reduce((acc, c) => acc + c.saldo, 0);
+    const claseSeccion = subtotalSeccion > 0 ? 'pos' : (subtotalSeccion < 0 ? 'neg' : 'zero');
+    const celdaSeccion = seccion === 'con'
+      ? `<td class="nombre" colspan="3">${titulo} <span class="seccion-count">(${items.length})</span></td>
+         <td class="saldo ${claseSeccion}">${formatMoneda(subtotalSeccion)}</td>`
+      : `<td class="nombre" colspan="4">${titulo} <span class="seccion-count">(${items.length})</span></td>`;
+
+    const cabecera = `<tbody class="seccion-sep"><tr><td colspan="4"></td></tr></tbody>
+      <tbody class="seccion-body ${seccion}"><tr class="seccion-row">${celdaSeccion}</tr></tbody>`;
+
+    const bloques = categorias.map(cat => {
+      const clave = `${seccion}|${cat}`;
+      const ordenados = grupos[cat].slice().sort((a, b) =>
+        seccion === 'con'
+          ? (fechaNum(a) - fechaNum(b) || a.nombre.localeCompare(b.nombre, 'es'))
+          : a.nombre.localeCompare(b.nombre, 'es')
+      );
+      const subtotal = ordenados.reduce((acc, c) => acc + c.saldo, 0);
+      const claseSubtotal = subtotal > 0 ? 'pos' : (subtotal < 0 ? 'neg' : 'zero');
+      const colapsado = estaColapsadoCliente_(clave) && !hayBusqueda;
+
+      const filas = ordenados.map(c => {
+        const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
+        const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
+        return `<tr class="cliente-row" data-cliente="${c.nombre.replace(/"/g,'&quot;')}">
+          <td class="fecha">${formatFecha(c.fecha)}</td>
+          <td class="nombre">${c.nombre}</td>
+          <td class="reparto">${c.reparto || '-'}</td>
+          <td class="saldo ${cls}">${formatMoneda(c.saldo)}</td>
+        </tr>`;
+      }).join('');
+
+      return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}" data-grupo="${clave.replace(/"/g,'&quot;')}">
+        <tr class="categoria-row">
+          <td class="nombre" colspan="3"><span class="caret">▾</span>${cat} <span class="grupo-count">(${ordenados.length})</span></td>
+          <td class="saldo ${claseSubtotal}">${formatMoneda(subtotal)}</td>
+        </tr>
+        ${filas}
+      </tbody>`;
     }).join('');
 
-    return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}" data-grupo="${cat.replace(/"/g,'&quot;')}">
-      <tr class="categoria-row">
-        <td class="nombre" colspan="3"><span class="caret">▾</span>${cat} <span class="grupo-count">(${items.length})</span></td>
-        <td class="saldo ${claseSubtotal}">${formatMoneda(subtotal)}</td>
-      </tr>
-      ${filas}
-    </tbody>`;
-  }).join('');
+    return cabecera + bloques;
+  }
+
+  const seccionesHtml =
+    armarSeccion('con', conSaldo, 'Clientes con saldo') +
+    armarSeccion('sin', sinSaldo, 'Clientes sin saldo');
 
   mainEl.innerHTML = `
     <div class="stock-table-wrap">
@@ -1397,16 +1443,15 @@ function renderTablaClientesAgrupada(lista, mensajeVacio){
             </tr>
           </thead>
           <tbody>${filaTotal}</tbody>
-          ${bloques}
+          ${seccionesHtml}
         </table>
       </div>
     </div>`;
 
   mainEl.querySelectorAll('tr.categoria-row').forEach(tr => {
     tr.addEventListener('click', () => {
-      const cat = tr.closest('tbody').dataset.grupo;
-      if(categoriasColapsadas.has(cat)) categoriasColapsadas.delete(cat);
-      else categoriasColapsadas.add(cat);
+      const clave = tr.closest('tbody').dataset.grupo;
+      colapsoClientes.set(clave, !estaColapsadoCliente_(clave));
       render();
     });
   });
@@ -1427,11 +1472,6 @@ function renderClientes(filtro){
       if(!filtro) return true;
       const texto = `${c.nombre} ${c.reparto}`.toLowerCase();
       return texto.includes(filtro.toLowerCase());
-    })
-    .filter(c => {
-      if(!ocultarSinSaldo) return true;
-      const redondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
-      return redondeado !== 0;
     });
 
   renderTablaClientesAgrupada(lista, 'Sin clientes que coincidan.');
@@ -1530,7 +1570,7 @@ function renderRevisionAgrupada(lista, mensajeVacio){
     (grupos[cat] = grupos[cat] || []).push(r);
   });
   const categorias = [...CONFIG.REPARTOS, 'Sin reparto'].filter(cat => grupos[cat] && grupos[cat].length);
-  const hayBusqueda = !!searchEl.value.trim();
+  const hayBusqueda = !!repartoRevision;
 
   const bloques = categorias.map(cat => {
     // La más vieja primero, la más nueva al final del grupo (tomando
@@ -1592,7 +1632,7 @@ function renderRevisionAgrupada(lista, mensajeVacio){
   actualizarSeleccionUI();
 }
 
-function renderRevision(filtro){
+function renderRevision(){
   const lista = revisiones
     .map(r => ({
       id: r['ID'],
@@ -1601,11 +1641,7 @@ function renderRevision(filtro){
       fechaReparto: r['Fecha Reparto'] || '',
       motivo: r['Motivo'] || ''
     }))
-    .filter(r => {
-      if(!filtro) return true;
-      const texto = `${r.reparto} ${r.motivo}`.toLowerCase();
-      return texto.includes(filtro.toLowerCase());
-    });
+    .filter(r => !repartoRevision || r.reparto === repartoRevision);
 
   renderRevisionAgrupada(lista, 'Sin revisiones que coincidan.');
 }
@@ -1658,7 +1694,9 @@ function restaurarScroll(){
 
 function render(){
   const filtro = searchEl.value.trim();
-  chipsRapidosEl.classList.toggle('hidden', currentTab !== 'movimientos');
+  chipsRapidosEl.classList.toggle('hidden', currentTab === 'clientes');
+  searchEl.classList.toggle('hidden', currentTab === 'revision');
+  marcarChipsReparto();
   mainEl.classList.toggle('grid-mode', currentTab === 'movimientos');
   mainEl.classList.toggle('ancho-tabla', currentTab === 'clientes' || currentTab === 'revision');
   fabNuevo.classList.toggle('hidden', miRol === 'visitante');
@@ -1673,8 +1711,7 @@ function render(){
     renderMovimientos(filtro);
   }else{
     headerTitle.textContent = 'Revisión';
-    searchEl.placeholder = 'Buscar revisión...';
-    renderRevision(filtro);
+    renderRevision();
   }
   restaurarScroll();
   posicionarFabs();
@@ -1719,12 +1756,19 @@ searchEl.addEventListener('input', () => {
 chipsRapidosEl.innerHTML = CONFIG.REPARTOS.map(r =>
   `<button type="button" class="chip-rapido" data-rep="${r}">${r}</button>`).join('');
 function marcarChipsReparto(){
+  const activo = currentTab === 'revision' ? repartoRevision : repartoRapido;
   chipsRapidosEl.querySelectorAll('.chip-rapido').forEach(b =>
-    b.classList.toggle('active', b.dataset.rep === repartoRapido));
+    b.classList.toggle('active', b.dataset.rep === activo));
 }
 chipsRapidosEl.addEventListener('click', (e) => {
   const btn = e.target.closest('.chip-rapido');
   if(!btn) return;
+  if(currentTab === 'revision'){
+    repartoRevision = (repartoRevision === btn.dataset.rep) ? '' : btn.dataset.rep;
+    deseleccionarFila();
+    render();
+    return;
+  }
   repartoRapido = (repartoRapido === btn.dataset.rep) ? '' : btn.dataset.rep;
   marcarChipsReparto();
   deseleccionarFila();
