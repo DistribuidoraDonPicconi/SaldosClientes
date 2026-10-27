@@ -177,7 +177,8 @@
   table.clientes tr.categoria-row td.nombre{ font-size:14px; font-weight:800; color:var(--azul-osc); text-transform:uppercase; letter-spacing:0.5px; border-left:4px solid var(--azul); }
   /* Más aire entre un reparto y el siguiente */
   table.clientes tbody.grupo-body{ border-top:0; }
-  table.clientes tbody.grupo-body + tbody.grupo-body tr.categoria-row td{ border-top:14px solid var(--fondo); }
+  table.clientes tbody.grupo-body + tbody.grupo-body tr.categoria-row td,
+  table.clientes tbody.seccion-body + tbody.grupo-body tr.categoria-row td{ border-top:14px solid var(--fondo); }
   table.clientes tbody.grupo-body tr.categoria-row td.saldo{ background:#e9eff9; }
   /* Subtítulos de sección (Clientes con saldo / sin saldo) */
   table.clientes tbody.seccion-sep td{ height:22px; padding:0; background:var(--fondo); border:none; }
@@ -2533,7 +2534,7 @@ fabEliminar.addEventListener('click', () => {
     deseleccionarFila();
     if(!clienteAEliminar) return;
     confirmEliminarTitulo.textContent = 'Eliminar cliente';
-    confirmEliminarTexto.textContent = 'Esta acción borra el cliente de la lista, tanto de la app como del Google Sheet. Si el cliente tiene movimientos cargados, primero hay que eliminarlos. No se puede deshacer.';
+    confirmEliminarTexto.textContent = 'Esta acción borra el cliente de forma permanente, tanto de la app como de la base de datos. Si el cliente tiene movimientos cargados, primero hay que eliminarlos. No se puede deshacer.';
     confirmEliminarModal.classList.remove('hidden');
   }else if(currentTab === 'movimientos'){
     idAEliminar = filaSeleccionadaId;
