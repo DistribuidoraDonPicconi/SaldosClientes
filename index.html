@@ -178,13 +178,17 @@
   /* Más aire entre un reparto y el siguiente */
   table.clientes tbody.grupo-body{ border-top:0; }
   table.clientes tbody.grupo-body + tbody.grupo-body tr.categoria-row td,
-  table.clientes tbody.seccion-body + tbody.grupo-body tr.categoria-row td{ border-top:14px solid var(--fondo); }
+  table.clientes tbody.seccion-body + tbody.grupo-body tr.categoria-row td{ border-top:8px solid var(--fondo); }
   table.clientes tbody.grupo-body tr.categoria-row td.saldo{ background:#e9eff9; }
   /* Subtítulos de sección (Clientes con saldo / sin saldo) */
   table.clientes tbody.seccion-sep td{ height:22px; padding:0; background:var(--fondo); border:none; }
   table.clientes tr.seccion-row td{ background:var(--azul-osc); color:#fff; padding:14px 12px; font-size:15px; font-weight:800; letter-spacing:0.4px; text-align:left; border:none; }
   table.clientes tr.seccion-row td.nombre{ color:#fff; text-align:left; font-size:15px; }
   table.clientes tr.seccion-row td.saldo{ color:#fff; font-size:15px; text-align:center; }
+  table.clientes tr.seccion-row{ cursor:pointer; user-select:none; }
+  table.clientes tr.seccion-row .caret{ display:inline-block; margin-right:8px; font-size:11px; transition:transform .15s ease; }
+  table.clientes tbody.seccion-body.colapsada tr.seccion-row .caret{ transform:rotate(-90deg); }
+  table.clientes tbody.grupo-body.sec-colapsada{ display:none; }
   table.clientes tr.seccion-row .seccion-count{ font-weight:600; font-size:12.5px; opacity:.75; }
   table.clientes tr.categoria-row td.saldo{ font-size:14.5px; font-weight:700; color:#1a1f2b; }
   table.clientes tr.categoria-row td.saldo.pos{ color:var(--rojo); }
@@ -646,7 +650,7 @@
         <div>
           <label for="nm-cliente">Cliente</label>
           <div class="combo" id="combo-cliente">
-            <input type="text" id="nm-cliente" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off" autocapitalize="words" role="combobox" aria-expanded="false" aria-controls="combo-clientes-lista">
+            <input type="text" id="nm-cliente" enterkeyhint="next" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off" autocapitalize="words" role="combobox" aria-expanded="false" aria-controls="combo-clientes-lista">
             <button type="button" class="combo-toggle" id="combo-toggle" tabindex="-1" aria-label="Ver clientes">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
@@ -667,11 +671,11 @@
         <div class="nm-reparto-hint" id="nm-reparto-hint"></div>
         <div>
           <label for="nm-importe">Importe</label>
-          <input type="text" inputmode="decimal" id="nm-importe" placeholder="$0">
+          <input type="text" inputmode="decimal" enterkeyhint="next" id="nm-importe" placeholder="$0">
         </div>
         <div>
           <label for="nm-entrego">Entregó</label>
-          <input type="text" inputmode="decimal" id="nm-entrego" placeholder="$0">
+          <input type="text" inputmode="decimal" enterkeyhint="done" id="nm-entrego" placeholder="$0">
         </div>
         <div>
           <label for="nm-saldo">Saldo</label>
@@ -684,7 +688,7 @@
       </div>
 
       <label for="nm-notas">Notas</label>
-      <textarea id="nm-notas" rows="1" maxlength="30" placeholder="Notas (opcional)"></textarea>
+      <textarea id="nm-notas" enterkeyhint="done" rows="1" maxlength="30" placeholder="Notas (opcional)"></textarea>
 
       <label for="nm-email">Usuario</label>
       <input type="text" id="nm-email" readonly>
@@ -707,7 +711,7 @@
       <input type="hidden" id="nc-nombre-original">
 
       <label>Nombre</label>
-      <input type="text" id="nc-nombre" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off">
+      <input type="text" id="nc-nombre" enterkeyhint="done" maxlength="30" placeholder="Ej: Fernanda" autocomplete="off">
 
       <label>Reparto</label>
       <div class="nm-reparto-grid" id="nc-reparto-grid"></div>
@@ -785,7 +789,7 @@
   </div>
 
   <div class="search-wrap" id="search-wrap">
-    <input type="text" id="search" placeholder="Buscar...">
+    <input type="text" id="search" enterkeyhint="done" placeholder="Buscar...">
     <div class="chips-rapidos hidden" id="chips-rapidos"></div>
   </div>
 
@@ -1326,6 +1330,13 @@ let ultimaListaClientesVisible = [];
 // saldo" quedan desplegados y los de "Clientes sin saldo" plegados.
 // Persiste mientras la app queda abierta.
 const colapsoClientes = new Map();
+// Plegado de las secciones completas ("Clientes con saldo" desplegada,
+// "Clientes sin saldo" plegada por defecto).
+const colapsoSecciones = new Map();
+function seccionColapsada_(seccion){
+  if(colapsoSecciones.has(seccion)) return colapsoSecciones.get(seccion);
+  return seccion === 'sin';
+}
 function estaColapsadoCliente_(clave){
   if(colapsoClientes.has(clave)) return colapsoClientes.get(clave);
   return clave.startsWith('sin|');
@@ -1383,12 +1394,13 @@ function renderTablaClientesAgrupada(lista, mensajeVacio){
     const subtotalSeccion = items.reduce((acc, c) => acc + c.saldo, 0);
     const claseSeccion = subtotalSeccion > 0 ? 'pos' : (subtotalSeccion < 0 ? 'neg' : 'zero');
     const celdaSeccion = seccion === 'con'
-      ? `<td class="nombre" colspan="3">${titulo} <span class="seccion-count">(${items.length})</span></td>
+      ? `<td class="nombre" colspan="3"><span class="caret">▾</span>${titulo} <span class="seccion-count">(${items.length})</span></td>
          <td class="saldo ${claseSeccion}">${formatMoneda(subtotalSeccion)}</td>`
-      : `<td class="nombre" colspan="4">${titulo} <span class="seccion-count">(${items.length})</span></td>`;
+      : `<td class="nombre" colspan="4"><span class="caret">▾</span>${titulo} <span class="seccion-count">(${items.length})</span></td>`;
 
+    const secColapsada = seccionColapsada_(seccion) && !hayBusqueda;
     const cabecera = `<tbody class="seccion-sep"><tr><td colspan="4"></td></tr></tbody>
-      <tbody class="seccion-body ${seccion}"><tr class="seccion-row">${celdaSeccion}</tr></tbody>`;
+      <tbody class="seccion-body ${seccion}${secColapsada ? ' colapsada' : ''}" data-seccion="${seccion}"><tr class="seccion-row">${celdaSeccion}</tr></tbody>`;
 
     const bloques = categorias.map(cat => {
       const clave = `${seccion}|${cat}`;
@@ -1412,7 +1424,7 @@ function renderTablaClientesAgrupada(lista, mensajeVacio){
         </tr>`;
       }).join('');
 
-      return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}" data-grupo="${clave.replace(/"/g,'&quot;')}">
+      return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}${secColapsada ? ' sec-colapsada' : ''}" data-grupo="${clave.replace(/"/g,'&quot;')}">
         <tr class="categoria-row">
           <td class="nombre" colspan="3"><span class="caret">▾</span>${cat} <span class="grupo-count">(${ordenados.length})</span></td>
           <td class="saldo ${claseSubtotal}">${formatMoneda(subtotal)}</td>
@@ -1448,6 +1460,14 @@ function renderTablaClientesAgrupada(lista, mensajeVacio){
         </table>
       </div>
     </div>`;
+
+  mainEl.querySelectorAll('tr.seccion-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const sec = tr.closest('tbody').dataset.seccion;
+      colapsoSecciones.set(sec, !seccionColapsada_(sec));
+      render();
+    });
+  });
 
   mainEl.querySelectorAll('tr.categoria-row').forEach(tr => {
     tr.addEventListener('click', () => {
@@ -2295,6 +2315,7 @@ nmCliente.addEventListener('keydown', e => {
   else if(e.key === 'Enter'){
     if(comboAbierto_() && comboIdx_ >= 0){ e.preventDefault(); comboElegir_(comboItems_[comboIdx_]); }
     else if(comboAbierto_() && comboItems_.length === 1 && normBusqueda_(nmCliente.value)){ e.preventDefault(); comboElegir_(comboItems_[0]); }
+    else { e.preventDefault(); comboCerrar_(); nmImporte.focus(); }
   }
   else if(e.key === 'Escape' && comboAbierto_()){ e.stopPropagation(); comboCerrar_(); }
   else if(e.key === 'Tab'){ comboCerrar_(); }
@@ -2533,6 +2554,13 @@ fabEliminar.addEventListener('click', () => {
     clienteAEliminar = clienteSeleccionadoNombre;
     deseleccionarFila();
     if(!clienteAEliminar) return;
+    const nombreEl = String(clienteAEliminar).trim();
+    if(movimientos.some(m => String(m['Cliente'] || '').trim() === nombreEl)){
+      const n = nombreEl;
+      clienteAEliminar = null;
+      alert('No se puede eliminar a "' + n + '" porque tiene movimientos cargados.\n\nEliminá primero sus movimientos y después el cliente.');
+      return;
+    }
     confirmEliminarTitulo.textContent = 'Eliminar cliente';
     confirmEliminarTexto.textContent = 'Esta acción borra el cliente de forma permanente, tanto de la app como de la base de datos. Si el cliente tiene movimientos cargados, primero hay que eliminarlos. No se puede deshacer.';
     confirmEliminarModal.classList.remove('hidden');
@@ -2577,7 +2605,7 @@ document.getElementById('confirm-eliminar-aceptar').addEventListener('click', as
     clienteAEliminar = null;
     tipoIdAEliminar = null;
   }catch(err){
-    alert('No se pudo eliminar: ' + err.message);
+    alert(/^No se puede eliminar/.test(err.message) ? err.message : 'No se pudo eliminar: ' + err.message);
   }finally{
     btnAceptar.disabled = false;
     btnAceptar.textContent = 'Eliminar';
@@ -2805,6 +2833,22 @@ if('serviceWorker' in navigator){
   });
 }
 /* ================================================================ */
+
+/* ============== Tecla OK del teclado ============== */
+// Enter / OK: Importe pasa a Entregó; el resto cierra el teclado.
+(function(){
+  const siguiente = { 'nm-importe': 'nm-entrego' };
+  ['nm-importe','nm-entrego','nm-notas','nc-nombre','search'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('keydown', e => {
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      const sig = siguiente[id] && document.getElementById(siguiente[id]);
+      if(sig) sig.focus(); else el.blur();
+    });
+  });
+})();
 </script>
 </body>
 </html>
