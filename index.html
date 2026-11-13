@@ -483,7 +483,6 @@
   .nuevo-body label[for="nm-notas"],
   .nuevo-body label[for="nm-email"]{ margin-top:8px; }
 
-  .nuevo-hint{ font-size:12.5px; color:var(--texto-tenue); margin-top:6px; line-height:1.4; }
 
   .nuevo-error{ padding:0 20px; color:var(--rojo); font-size:13.5px; font-weight:600; min-height:18px; }
   .nuevo-footer{
@@ -536,6 +535,47 @@
   .lock-box .login-checking{
     color:var(--texto-tenue); font-size:14px; margin-top:6px; min-height:44px;
   }
+  /* Selector de fecha propio */
+  .fecha-btn{
+    width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:11px 12px; border-radius:10px; border:1px solid var(--azul-borde);
+    background:#fff; font-size:17px; color:#1a1f2b; cursor:pointer; text-align:left;
+    font-family:inherit;
+  }
+  .fecha-btn.vacio .fp-texto{ color:#9aa3b8; }
+  .fecha-btn svg{ width:19px; height:19px; color:var(--azul); flex-shrink:0; }
+  .resumen-fecha-campo .fecha-btn{ font-size:15px; padding:10px 12px; border-radius:11px; }
+  #fecha-modal{
+    position:fixed; inset:0; z-index:180;
+    background:rgba(17,22,36,0.55);
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  #fecha-modal.hidden{ display:none; }
+  .fp-nav{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
+  .fp-nav button{
+    border:1px solid var(--azul-borde); background:#fff; color:var(--azul);
+    border-radius:11px; height:42px; cursor:pointer; font-weight:800;
+  }
+  .fp-nav .fp-flecha{ width:44px; font-size:20px; line-height:1; flex-shrink:0; }
+  .fp-nav .fp-titulo{ flex:1; font-size:17px; color:var(--azul-osc); background:var(--azul-suave); }
+  .fp-nav button:active{ opacity:0.85; }
+  .fp-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .fp-grid.meses{ grid-template-columns:repeat(3,1fr); gap:8px; }
+  .fp-dow{
+    text-align:center; font-size:12.5px; font-weight:800; color:var(--texto-tenue); padding:4px 0 6px;
+  }
+  .fp-dia, .fp-mes{
+    min-height:44px; border:1.5px solid transparent; background:transparent; border-radius:11px;
+    font-size:16px; font-weight:700; color:#1a1f2b; cursor:pointer; font-family:inherit;
+  }
+  .fp-mes{ border-color:var(--azul-borde); background:#f2f4f8; color:#3a4560; font-size:15.5px; min-height:52px; }
+  .fp-dia.vacio{ visibility:hidden; cursor:default; }
+  .fp-dia.hoy, .fp-mes.hoy{ border-color:var(--azul); }
+  .fp-dia.sel, .fp-mes.sel{
+    background:var(--azul); border-color:var(--azul); color:#fff;
+    box-shadow:0 2px 6px rgba(42,92,201,0.35);
+  }
+  .fp-dia:active:not(.vacio), .fp-mes:active{ opacity:0.85; }
 </style>
 </head>
 <body>
@@ -557,7 +597,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
     </div>
     <h3 id="confirm-eliminar-titulo">Eliminar movimiento</h3>
-    <p id="confirm-eliminar-texto">Esta acción borra el movimiento de forma permanente, tanto de la app como del Google Sheet, y recalcula el saldo del cliente. No se puede deshacer.</p>
+    <p id="confirm-eliminar-texto">Esta acción borra el movimiento de forma permanente, tanto de la app como de la base de datos, y recalcula el saldo del cliente. No se puede deshacer.</p>
     <div class="confirm-actions">
       <button class="btn-cancelar" id="confirm-eliminar-cancelar">Cancelar</button>
       <button class="btn-confirmar" id="confirm-eliminar-aceptar">Eliminar</button>
@@ -633,6 +673,28 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
 </button>
 
+<div id="fecha-modal" class="hidden">
+  <div class="nuevo-box">
+    <div class="nuevo-header">
+      <h3>Elegí la fecha</h3>
+      <button class="nuevo-close" id="fp-cerrar" aria-label="Cerrar">×</button>
+    </div>
+    <div class="nuevo-body">
+      <div class="fp-nav">
+        <button type="button" class="fp-flecha" id="fp-prev" aria-label="Anterior">‹</button>
+        <button type="button" class="fp-titulo" id="fp-titulo"></button>
+        <button type="button" class="fp-flecha" id="fp-next" aria-label="Siguiente">›</button>
+      </div>
+      <div class="fp-grid" id="fp-grid"></div>
+    </div>
+    <div class="nuevo-footer">
+      <button class="btn-cancelar" id="fp-cancelar">Cancelar</button>
+      <button class="btn-cancelar" id="fp-borrar" hidden>Borrar</button>
+      <button class="btn-guardar" id="fp-hoy">Hoy</button>
+    </div>
+  </div>
+</div>
+
 <div id="nuevo-modal" class="hidden">
   <div class="nuevo-box">
     <div class="nuevo-header">
@@ -645,7 +707,7 @@
       <div class="nm-fecha-cliente-grid">
         <div>
           <label for="nm-fecha">Fecha</label>
-          <input type="date" id="nm-fecha">
+          <input type="hidden" id="nm-fecha" data-fecha>
         </div>
         <div>
           <label for="nm-cliente">Cliente</label>
@@ -737,11 +799,11 @@
       <div class="nm-fecha-cliente-grid">
         <div>
           <label for="nr-fecha-revision">Fecha revisión</label>
-          <input type="date" id="nr-fecha-revision">
+          <input type="hidden" id="nr-fecha-revision" data-fecha>
         </div>
         <div>
           <label for="nr-fecha-reparto">Fecha reparto</label>
-          <input type="date" id="nr-fecha-reparto">
+          <input type="hidden" id="nr-fecha-reparto" data-fecha data-fecha-opcional>
         </div>
       </div>
 
@@ -819,9 +881,9 @@ const CONFIG = {
   GOOGLE_CLIENT_ID: '1084049770580-2fj67hnjffsjo1ahm8u9n9cg2k6n0ssk.apps.googleusercontent.com',
 
   // Roles solo para decidir qué botones mostrar en la interfaz. La
-  // seguridad real (quién puede leer/escribir qué) la aplica
-  // firestore.rules del lado del servidor con esta misma lista; si
-  // agregás o sacás a alguien, actualizá los DOS lugares.
+  // seguridad real (quién puede leer/escribir qué) la aplican las reglas
+  // de Firestore (firestore.rules) con esta misma lista; si agregás o
+  // sacás a alguien, actualizá los DOS lugares.
   ROLES: {
     'nicolaspicconi@gmail.com': 'admin',
     'distribuidoradonpicconi@gmail.com': 'colaborador',
@@ -830,7 +892,6 @@ const CONFIG = {
     'alejandropicconi@gmail.com': 'visitante'
   },
 
-  CAMPO_FECHA: 'Fecha',
   REPARTOS: ['Granja', 'Reparto 1', 'Reparto 2', 'Reparto 3']
 };
 /* ============================================= */
@@ -839,7 +900,7 @@ const CONFIG = {
 firebase.initializeApp(CONFIG.firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-const LOCK_TTL_MS = 5 * 60 * 1000; // 5 minutos, igual que antes
+const LOCK_TTL_MS = 5 * 60 * 1000; // 5 minutos
 /* ======================================== */
 
 /* ============== LOGIN CON GOOGLE (vía Firebase Auth) ============== */
@@ -894,7 +955,7 @@ function iniciarLogin(){
 
 // Única fuente de verdad de la sesión: Firebase Auth. Cuando cambia
 // (login, logout, o al recargar la página con sesión ya persistida),
-// buscamos el rol del usuario en la colección "roles" de Firestore.
+// buscamos su rol en CONFIG.ROLES (por email) y cargamos los datos.
 let sesionResuelta = false; // pasa a true cuando Firebase responde por primera vez
 auth.onAuthStateChanged(async (user) => {
   sesionResuelta = true;
@@ -921,7 +982,7 @@ auth.onAuthStateChanged(async (user) => {
   }catch(err){
     // No cerramos la sesión por un error pasajero (red, etc.): se muestra el
     // aviso y el usuario puede reintentar con el botón de actualizar.
-    mainEl.innerHTML = `<div class="state-msg error">No se pudo cargar la app.<br>${err.message}</div>`;
+    mainEl.innerHTML = `<div class="state-msg error">No se pudo cargar la app.<br>${escHTML_(err.message)}</div>`;
   }
 });
 
@@ -977,8 +1038,8 @@ function ordenComparable_(valor){
 
 // Recalcula Saldo Anterior / Saldo / Saldo Acumulado de todos los
 // movimientos de los clientes indicados, y el resumen (Fecha Último
-// Movimiento / Saldo Acumulado) de cada uno. Equivalente en el cliente
-// a lo que antes hacía recalcularTodo_ en el servidor.
+// Movimiento / Saldo Acumulado) de cada uno. Se hace acá, en la app,
+// cada vez que se guarda o elimina un movimiento.
 async function recalcularClientes_(nombres){
   const nombresUnicos = [...new Set((nombres || []).map(n => String(n || '').trim()).filter(Boolean))];
   if(!nombresUnicos.length) return;
@@ -1086,7 +1147,7 @@ async function guardarMovimientoFirestore_(payload){
       'Fecha Real': firebase.firestore.FieldValue.serverTimestamp(),
       // Se fija una sola vez, acá, y nunca se vuelve a tocar (ni al
       // editar el movimiento): es lo que define su posición fija en la
-      // lista, equivalente a la posición de una fila en el Sheet viejo.
+      // lista.
       'Orden': firebase.firestore.FieldValue.serverTimestamp()
     });
   }
@@ -1226,22 +1287,21 @@ let revisiones = [];
 let currentTab = 'clientes';
 let repartoRevision = ''; // filtro por Reparto de la pestaña Revisión (botones, sin buscador)
 let repartoRapido = '';   // filtro rápido por Reparto (botones bajo el buscador, solo en Movimientos)
-let miRol = null; // 'admin', 'colaborador' o 'visitante', lo manda el servidor en cada carga
+let miRol = null; // 'admin', 'colaborador' o 'visitante', según CONFIG.ROLES
 let miEmail = null; // email de Google de quien está logueado, para el campo "Cargado por"
 
 const mainEl = document.getElementById('main');
 const searchEl = document.getElementById('search');
-const searchWrapEl = document.getElementById('search-wrap');
 const chipsRapidosEl = document.getElementById('chips-rapidos');
 const headerTitle = document.getElementById('header-title');
 const btnRefresh = document.getElementById('btn-refresh');
 const btnCompartir = document.getElementById('btn-compartir');
 
-// Convierte el valor de "Fecha" que viene del servidor a un Date local,
+// Convierte el valor de "Fecha" que viene de Firestore a un Date local,
 // sin el corrimiento de huso horario de `new Date("YYYY-MM-DD")` (JS lo
 // interpreta como medianoche UTC). Un movimiento recién guardado en esta
 // misma sesión todavía tiene la fecha como ese string plano (no se volvió
-// a leer de la hoja); uno ya sincronizado viene como fecha completa con
+// a leer de Firestore); uno ya sincronizado viene como fecha completa con
 // hora. Usar siempre esto en vez de `new Date(valor)` sobre un campo Fecha.
 function parsearFechaLocal_(valor){
   if(valor instanceof Date) return valor;
@@ -1286,9 +1346,8 @@ function formatMoneda(n){
   return redondeado < 0 ? `-${str}` : str;
 }
 
-// Trae todo de Firestore de nuevo y vuelve a renderizar. Al no depender
-// de un delta calculado por el servidor, cada acción (guardar, eliminar,
-// etc.) simplemente llama esto al final: siempre queda consistente con
+// Trae todo de Firestore de nuevo y vuelve a renderizar. Cada acción
+// (guardar, eliminar, etc.) simplemente llama esto al final: siempre queda consistente con
 // lo que hay en la base, al costo de un par de lecturas extra (gratis
 // hasta un volumen alto en el plan Spark).
 async function cargarDatos(){
@@ -1298,7 +1357,7 @@ async function cargarDatos(){
       // orderBy('Orden'): sin esto, Firestore devuelve los movimientos en
       // un orden interno arbitrario (no el de carga). "Orden" se fija una
       // sola vez al crear el movimiento y nunca se toca al editar, así el
-      // orden de la lista queda estable igual que las filas de un Sheet.
+      // orden de la lista queda estable.
       db.collection('movimientos').orderBy('Orden', 'asc').get(),
       db.collection('clientes').get(),
       db.collection('revisiones').orderBy('Orden', 'asc').get()
@@ -1315,7 +1374,7 @@ async function cargarDatos(){
       auth.signOut();
       return;
     }
-    mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos de Firebase.<br>${err.message}</div>`;
+    mainEl.innerHTML = `<div class="state-msg error">No se pudieron cargar los datos de Firebase.<br>${escHTML_(err.message)}</div>`;
   }finally{
     btnRefresh.classList.remove('spinning');
   }
@@ -1416,10 +1475,10 @@ function renderTablaClientesAgrupada(lista, mensajeVacio){
       const filas = ordenados.map(c => {
         const saldoRedondeado = Math.round((c.saldo + Number.EPSILON) * 100) / 100;
         const cls = saldoRedondeado > 0 ? 'pos' : (saldoRedondeado < 0 ? 'neg' : 'zero');
-        return `<tr class="cliente-row" data-cliente="${c.nombre.replace(/"/g,'&quot;')}">
+        return `<tr class="cliente-row" data-cliente="${escHTML_(c.nombre)}">
           <td class="fecha">${formatFecha(c.fecha)}</td>
-          <td class="nombre">${c.nombre}</td>
-          <td class="reparto">${c.reparto || '-'}</td>
+          <td class="nombre">${escHTML_(c.nombre)}</td>
+          <td class="reparto">${escHTML_(c.reparto || '-')}</td>
           <td class="saldo ${cls}">${formatMoneda(c.saldo)}</td>
         </tr>`;
       }).join('');
@@ -1524,17 +1583,17 @@ function renderMovimientos(filtro){
       const clsSaldo = saldo > 0 ? 'neg' : (saldo < 0 ? 'pos' : 'zero');
       const clsSaldoAcum = saldoAcum > 0 ? 'neg' : (saldoAcum < 0 ? 'pos' : 'zero');
 
-      return `<tr class="mov-row" data-id="${mov['ID'] || ''}">
-        <td class="fecha">${formatFecha(mov[CONFIG.CAMPO_FECHA])}</td>
-        <td class="cliente">${mov['Cliente'] || '-'}</td>
-        <td>${mov['Reparto'] || '-'}</td>
+      return `<tr class="mov-row" data-id="${escHTML_(mov['ID'] || '')}">
+        <td class="fecha">${formatFecha(mov['Fecha'])}</td>
+        <td class="cliente">${escHTML_(mov['Cliente'] || '-')}</td>
+        <td>${escHTML_(mov['Reparto'] || '-')}</td>
         <td class="num ${clsSaldoAnterior}">${formatMoneda(saldoAnterior)}</td>
         ${celdaImporte}
         ${celdaEntrego}
         <td class="num sal ${clsSaldo}">${formatMoneda(saldo)}</td>
         <td class="num ${clsSaldoAcum}">${formatMoneda(saldoAcum)}</td>
-        <td class="notas">${mov['Notas'] || '-'}</td>
-        <td class="usuario">${mov['Usuario'] || '-'}</td>
+        <td class="notas">${escHTML_(mov['Notas'] || '-')}</td>
+        <td class="usuario">${escHTML_(mov['Usuario'] || '-')}</td>
       </tr>`;
     }).join('');
 
@@ -1601,13 +1660,13 @@ function renderRevisionAgrupada(lista, mensajeVacio){
     );
     const colapsado = categoriasColapsadasRevision.has(cat) && !hayBusqueda;
 
-    const filas = items.map(r => `<tr class="rev-row" data-id="${r.id}">
+    const filas = items.map(r => `<tr class="rev-row" data-id="${escHTML_(r.id)}">
       <td class="fecha">${formatFecha(r.fechaRevision)}</td>
       <td class="fecha">${formatFecha(r.fechaReparto)}</td>
-      <td class="motivo">${r.motivo || '-'}</td>
+      <td class="motivo">${escHTML_(r.motivo || '-')}</td>
     </tr>`).join('');
 
-    return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}" data-grupo="${cat.replace(/"/g,'&quot;')}">
+    return `<tbody class="grupo-body${colapsado ? ' colapsado' : ''}" data-grupo="${escHTML_(cat)}">
       <tr class="categoria-row">
         <td class="nombre" colspan="3"><span class="caret">▾</span>${cat} <span class="grupo-count">(${items.length})</span></td>
       </tr>
@@ -1957,11 +2016,6 @@ function armarTextoSaldos_(lista){
   });
   const categorias = [...CONFIG.REPARTOS, 'Sin reparto'].filter(cat => grupos[cat] && grupos[cat].length);
 
-  const MAX_NOMBRE = 20;
-  const recortar = s => s.length > MAX_NOMBRE ? s.slice(0, MAX_NOMBRE - 1) + '…' : s;
-  const todosLosMontos = lista.map(c => formatMoneda(c.saldo));
-  const anchoMonto = Math.max(...todosLosMontos.map(s => s.length), formatMoneda(total).length);
-
   const lineas = [];
   lineas.push('*SALDOS DE CLIENTES*');
   lineas.push('Distribuidora Don Picconi');
@@ -1974,7 +2028,6 @@ function armarTextoSaldos_(lista){
     const items = grupos[cat].slice().sort((a, b) =>
       fechaComparable_(a.fecha) - fechaComparable_(b.fecha) || a.nombre.localeCompare(b.nombre, 'es'));
     const subtotal = redondear(items.reduce((acc, c) => acc + c.saldo, 0));
-    const anchoNombre = Math.min(MAX_NOMBRE, Math.max(...items.map(c => c.nombre.length)));
 
     lineas.push('');
     lineas.push(`━━━━━━━━━━━━━━`);
@@ -2062,6 +2115,130 @@ btnCompartir.addEventListener('click', async () => {
   }
 });
 
+/* ============== Selector de fecha propio ============== */
+// Reemplaza al <input type="date"> nativo. Cada input[data-fecha] pasa a ser
+// un campo oculto (conserva el valor YYYY-MM-DD, igual que antes) y se le
+// agrega un botón que abre un calendario con el estilo de la app. Al elegir
+// un día se dispara el evento 'change', así la lógica existente no cambia.
+const FP_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const FP_MESES_CORTOS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const FP_DIAS = ['L','M','M','J','V','S','D'];   // semana de lunes a domingo
+const FP_ICONO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+const fpModal = document.getElementById('fecha-modal');
+const fpGrid = document.getElementById('fp-grid');
+const fpBorrar = document.getElementById('fp-borrar');
+const fpTitulo = document.getElementById('fp-titulo');
+let fpInput = null, fpVista = 'dias', fpMes = 0, fpAnio = 0;
+
+function fpParse(str){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str || '');
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+function fpSyncBoton(input){
+  const d = fpParse(input.value);
+  input._fpBtn.querySelector('.fp-texto').textContent = d ? formatFecha(d) : 'Elegir fecha';
+  input._fpBtn.classList.toggle('vacio', !d);
+}
+function fpElegir(fechaStr){
+  if(!fpInput) return;
+  fpInput.value = fechaStr;
+  fpInput.dispatchEvent(new Event('change'));
+  fpCerrar();
+}
+function fpCerrar(){ fpModal.classList.add('hidden'); fpInput = null; }
+
+function fpRender(){
+  const sel = fpInput ? fpParse(fpInput.value) : null;
+  const hoy = new Date();
+  if(fpVista === 'meses'){
+    fpTitulo.textContent = String(fpAnio);
+    fpGrid.className = 'fp-grid meses';
+    fpGrid.innerHTML = FP_MESES_CORTOS.map((nombre, i) => {
+      const esHoy = hoy.getFullYear() === fpAnio && hoy.getMonth() === i;
+      const esSel = sel && sel.getFullYear() === fpAnio && sel.getMonth() === i;
+      return `<button type="button" class="fp-mes${esHoy ? ' hoy' : ''}${esSel ? ' sel' : ''}" data-m="${i}">${nombre}</button>`;
+    }).join('');
+    return;
+  }
+  fpTitulo.textContent = `${FP_MESES[fpMes]} ${fpAnio}`;
+  fpGrid.className = 'fp-grid';
+  const offset = (new Date(fpAnio, fpMes, 1).getDay() + 6) % 7;
+  const diasMes = new Date(fpAnio, fpMes + 1, 0).getDate();
+  let html = FP_DIAS.map(d => `<div class="fp-dow">${d}</div>`).join('');
+  for(let i = 0; i < offset; i++) html += '<button type="button" class="fp-dia vacio" tabindex="-1" disabled></button>';
+  for(let d = 1; d <= diasMes; d++){
+    const esHoy = hoy.getFullYear() === fpAnio && hoy.getMonth() === fpMes && hoy.getDate() === d;
+    const esSel = sel && sel.getFullYear() === fpAnio && sel.getMonth() === fpMes && sel.getDate() === d;
+    html += `<button type="button" class="fp-dia${esHoy ? ' hoy' : ''}${esSel ? ' sel' : ''}" data-d="${d}">${d}</button>`;
+  }
+  fpGrid.innerHTML = html;
+}
+
+function fpAbrir(input){
+  fpInput = input;
+  const base = fpParse(input.value) || new Date();
+  fpMes = base.getMonth();
+  fpAnio = base.getFullYear();
+  fpVista = 'dias';
+  // "Borrar" solo aparece en los campos opcionales (data-fecha-opcional).
+  fpBorrar.hidden = !input.hasAttribute('data-fecha-opcional');
+  fpRender();
+  fpModal.classList.remove('hidden');
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+
+fpGrid.addEventListener('click', (e) => {
+  const dia = e.target.closest('.fp-dia[data-d]');
+  if(dia){
+    fpElegir(fechaLocalInput(new Date(fpAnio, fpMes, Number(dia.dataset.d))));
+    return;
+  }
+  const mes = e.target.closest('.fp-mes');
+  if(mes){
+    fpMes = Number(mes.dataset.m);
+    fpVista = 'dias';
+    fpRender();
+  }
+});
+document.getElementById('fp-prev').addEventListener('click', () => {
+  if(fpVista === 'meses'){ fpAnio--; }
+  else{ fpMes--; if(fpMes < 0){ fpMes = 11; fpAnio--; } }
+  fpRender();
+});
+document.getElementById('fp-next').addEventListener('click', () => {
+  if(fpVista === 'meses'){ fpAnio++; }
+  else{ fpMes++; if(fpMes > 11){ fpMes = 0; fpAnio++; } }
+  fpRender();
+});
+fpTitulo.addEventListener('click', () => {
+  fpVista = fpVista === 'dias' ? 'meses' : 'dias';
+  fpRender();
+});
+document.getElementById('fp-hoy').addEventListener('click', () => fpElegir(fechaLocalInput(new Date())));
+document.getElementById('fp-cancelar').addEventListener('click', fpCerrar);
+document.getElementById('fp-borrar').addEventListener('click', () => fpElegir(''));
+document.getElementById('fp-cerrar').addEventListener('click', fpCerrar);
+fpModal.addEventListener('click', (e) => { if(e.target === fpModal) fpCerrar(); });
+
+document.querySelectorAll('input[data-fecha]').forEach(input => {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'fecha-btn vacio';
+  btn.innerHTML = `<span class="fp-texto">Elegir fecha</span>${FP_ICONO}`;
+  input.insertAdjacentElement('afterend', btn);
+  input._fpBtn = btn;
+  // Cada vez que el código le asigne .value al input (ej: al abrir el
+  // formulario), el texto del botón se actualiza solo.
+  const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  Object.defineProperty(input, 'value', {
+    get(){ return desc.get.call(this); },
+    set(v){ desc.set.call(this, v); fpSyncBoton(this); }
+  });
+  btn.addEventListener('click', () => fpAbrir(input));
+  fpSyncBoton(input);
+});
+/* =============================================== */
+
 /* ============== Selección y FABs (Movimientos + Clientes) ============== */
 const fabNuevo = document.getElementById('fab-nuevo');
 const fabAcciones = document.getElementById('fab-acciones');
@@ -2076,23 +2253,20 @@ let clienteSeleccionadoNombre = null;
 // pestaña Clientes, ese mismo botón se reutiliza para saltar a ver los
 // movimientos del cliente seleccionado (mismo ícono de FAB, otro uso).
 const ICONO_COPIAR_MOV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-const ICONO_VER_MOVIMIENTOS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
 
 function actualizarIconosFabAcciones(){
   // "Ver movimientos" solo existe en la pestaña Clientes.
   fabVer.classList.toggle('hidden', currentTab !== 'clientes');
+  fabCopiar.innerHTML = ICONO_COPIAR_MOV;
   if(currentTab === 'clientes'){
-    fabCopiar.innerHTML = ICONO_COPIAR_MOV;
     fabCopiar.setAttribute('aria-label', 'Duplicar: cargar saldo a este cliente');
     fabEditar.setAttribute('aria-label', 'Editar cliente');
     fabEliminar.setAttribute('aria-label', 'Eliminar cliente');
   }else if(currentTab === 'movimientos'){
-    fabCopiar.innerHTML = ICONO_COPIAR_MOV;
     fabCopiar.setAttribute('aria-label', 'Copiar movimiento');
     fabEditar.setAttribute('aria-label', 'Editar movimiento');
     fabEliminar.setAttribute('aria-label', 'Eliminar movimiento');
   }else{
-    fabCopiar.innerHTML = ICONO_COPIAR_MOV;
     fabCopiar.setAttribute('aria-label', 'Copiar revisión');
     fabEditar.setAttribute('aria-label', 'Editar revisión');
     fabEliminar.setAttribute('aria-label', 'Eliminar revisión');
@@ -2101,11 +2275,11 @@ function actualizarIconosFabAcciones(){
 
 // Un colaborador puede agregar, pero no editar ni eliminar (ni
 // movimientos ni clientes). Los botones "Editar" y "Eliminar" se
-// ocultan para ese rol; el servidor igual rechaza esas acciones aunque
-// alguien fuerce el botón.
+// ocultan para ese rol; las reglas de Firestore igual rechazan esas
+// acciones aunque alguien fuerce el botón.
 // Un visitante es de solo lectura: se le ocultan TODOS los botones de
-// acción (nuevo, copiar, editar, eliminar); el servidor también
-// rechaza cualquier acción para este rol como resguardo extra.
+// acción (nuevo, copiar, editar, eliminar); las reglas de Firestore
+// también rechazan cualquier escritura de este rol como resguardo extra.
 function aplicarPermisosUI(){
   const esVisitante = miRol === 'visitante';
   fabEditar.classList.toggle('hidden', miRol !== 'admin');
@@ -2199,8 +2373,8 @@ function pintarSaldoPreview(input, valor){
 // esta carga nueva. Si se está editando un movimiento existente, le
 // resta el aporte de ese mismo movimiento (su Saldo actual), para
 // mostrar el saldo que había antes de que ese movimiento existiera.
-// Es una estimación: el valor definitivo siempre lo recalcula el
-// servidor al guardar, en orden de fechas.
+// Es una estimación: el valor definitivo siempre lo recalcula la app
+// al guardar, en orden de fechas.
 function actualizarSaldosPreview(){
   const nombre = nmCliente.value.trim().toLowerCase();
   const editId = nmEditId.value;
@@ -2239,8 +2413,9 @@ let comboItems_ = [];
 function normBusqueda_(t){
   return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 }
-function escHtmlCombo_(t){
-  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// Escapa texto para meterlo en innerHTML (o en un atributo entre comillas).
+function escHTML_(t){
+  return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function comboAbierto_(){ return !comboLista.hidden; }
 
@@ -2266,13 +2441,13 @@ function comboRender_(){
     return;
   }
   comboLista.innerHTML = lista.map((n, i) => {
-    let html = escHtmlCombo_(n);
+    let html = escHTML_(n);
     if(q && !exacto){
       const pos = normBusqueda_(n).indexOf(q);
       // normBusqueda_ puede cambiar el largo si hay tildes combinadas; solo
       // resaltamos cuando los largos coinciden.
       if(pos >= 0 && normBusqueda_(n).length === n.length){
-        html = escHtmlCombo_(n.slice(0, pos)) + '<b>' + escHtmlCombo_(n.slice(pos, pos + q.length)) + '</b>' + escHtmlCombo_(n.slice(pos + q.length));
+        html = escHTML_(n.slice(0, pos)) + '<b>' + escHTML_(n.slice(pos, pos + q.length)) + '</b>' + escHTML_(n.slice(pos + q.length));
       }
     }
     return '<li role="option" data-i="' + i + '">' + html + '</li>';
@@ -2358,8 +2533,68 @@ function limpiarCantidadParaEnvio(valorFormateado){
   return valorFormateado.replace(/\$/g, '').replace(/\./g, '');
 }
 
+// Formatea el valor de un input EN VIVO sin mandar el cursor al final.
+// Cuenta cuántos caracteres "significativos" (dígitos y coma) hay antes del
+// cursor, formatea, y vuelve a poner el cursor después de esa misma cantidad
+// de caracteres significativos en el texto nuevo. Los puntos de miles y el $
+// no cuentan, así que el cursor no se corre cuando aparecen o desaparecen.
+function formatearConCursor(inp, e){
+  const SIG = /[0-9,]/g;
+  const sig = (s) => (s.match(SIG) || []).length;
+  let crudo = inp.value;
+  let pos = inp.selectionStart;
+  if(pos === null || pos === undefined) pos = crudo.length;
+
+  // Si con Backspace/Supr se borró solo un separador (punto de miles o $),
+  // el formateo lo volvería a poner y el usuario quedaría trabado. En ese caso
+  // se borra en su lugar el dígito vecino.
+  const prev = inp._prevVal || '';
+  const tipo = e && e.inputType;
+  if((tipo === 'deleteContentBackward' || tipo === 'deleteContentForward')
+      && crudo.length < prev.length && sig(crudo) === sig(prev)){
+    if(tipo === 'deleteContentBackward'){
+      let i = pos - 1;
+      while(i >= 0 && !/[0-9,]/.test(crudo[i])) i--;
+      if(i >= 0){ crudo = crudo.slice(0, i) + crudo.slice(i + 1); pos = i; }
+    }else{
+      let i = pos;
+      while(i < crudo.length && !/[0-9,]/.test(crudo[i])) i++;
+      if(i < crudo.length){ crudo = crudo.slice(0, i) + crudo.slice(i + 1); pos = i; }
+    }
+  }
+
+  const sigAntes = sig(crudo.slice(0, pos));
+  const nuevo = formatearCantidad(crudo);
+  inp.value = nuevo;
+  inp._prevVal = nuevo;
+
+  // buscar en el texto nuevo la posición que deja `sigAntes` caracteres
+  // significativos a la izquierda del cursor
+  let nuevaPos = nuevo.length;
+  if(sigAntes === 0){
+    const m = nuevo.search(/[0-9,]/);
+    nuevaPos = m === -1 ? nuevo.length : m;
+  }else{
+    let vistos = 0;
+    for(let i = 0; i < nuevo.length; i++){
+      if(/[0-9,]/.test(nuevo[i])){
+        vistos++;
+        if(vistos === sigAntes){ nuevaPos = i + 1; break; }
+      }
+    }
+  }
+  try{ inp.setSelectionRange(nuevaPos, nuevaPos); }catch(_){}
+}
+
+// Guarda el valor justo antes de cada edición (para detectar borrados de separadores)
+document.addEventListener('beforeinput', (e) => {
+  if(e.target && e.target.matches && e.target.matches('#nm-importe, #nm-entrego')){
+    e.target._prevVal = e.target.value;
+  }
+});
+
 [nmImporte, nmEntrego].forEach(inp => {
-  inp.addEventListener('input', () => { inp.value = formatearCantidad(inp.value); });
+  inp.addEventListener('input', (e) => formatearConCursor(inp, e));
 });
 
 function numeroAInputStr(num){
@@ -2376,8 +2611,8 @@ function abrirNuevoModal(mov, modoEditar){
 
   nmCliente.value = precargar ? (mov['Cliente'] || '') : '';
   actualizarRepartoSegunCliente();
-  nmFecha.value = precargar && mov[CONFIG.CAMPO_FECHA]
-    ? fechaLocalInput(parsearFechaLocal_(mov[CONFIG.CAMPO_FECHA]))
+  nmFecha.value = precargar && mov['Fecha']
+    ? fechaLocalInput(parsearFechaLocal_(mov['Fecha']))
     : fechaLocalInput(new Date());
 
   nmImporte.value = (precargar && modoEditar) ? numeroAInputStr(mov['Importe']) : '';
@@ -2407,11 +2642,11 @@ function cerrarNuevoModal(){
 
 // ============== Lock de edición (avisa si otro usuario ya está
 // editando la misma fila) ==============
-// Antes de abrir el formulario en modo "Editar" pedimos el lock al
-// servidor; si otra persona ya lo tiene, avisamos y no abrimos el
+// Antes de abrir el formulario en modo "Editar" pedimos el lock a
+// Firestore; si otra persona ya lo tiene, avisamos y no abrimos el
 // formulario. Al cerrar el formulario (cancelar o guardar con éxito)
 // se libera. Si se cierra la pestaña sin avisar, el lock expira solo
-// a los 5 minutos (ver LOCK_TTL_SEGUNDOS en Código.gs).
+// a los 5 minutos (ver LOCK_TTL_MS).
 let lockIdActivo = null;
 
 async function pedirLock(id){
@@ -2424,7 +2659,6 @@ async function pedirLock(id){
         const datos = snap.data();
         const expiraMs = datos.expira && datos.expira.toMillis ? datos.expira.toMillis() : 0;
         if(datos.email !== miEmail && expiraMs > ahora){
-          const minutosRestantes = Math.max(1, Math.ceil((expiraMs - ahora) / 60000));
           throw new Error('Esto lo está editando ahora ' + datos.email + '. Probá de nuevo en unos minutos (o pedile que termine y cierre el formulario).');
         }
       }
