@@ -2059,11 +2059,11 @@ function armarTextoSaldos_(lista){
     lineas.push(`*${formatMoneda(subtotal)}*`);
     lineas.push(`━━━━━━━━━━━━━━`);
     items.forEach(c => {
-      // Fecha del último movimiento, y debajo el cliente con su saldo.
+      // Cliente arriba; debajo, fecha del último movimiento | saldo.
       const f = formatFecha(c.fecha);
       const fechaCorta = f.length === 10 ? f.slice(0, 6) + f.slice(8) : f;
-      lineas.push(`• _${fechaCorta}_`);
-      lineas.push(`  ${c.nombre}: *${formatMoneda(c.saldo)}*`);
+      lineas.push(`• ${c.nombre}:`);
+      lineas.push(`  _${fechaCorta}_ | *${formatMoneda(c.saldo)}*`);
     });
   });
 
