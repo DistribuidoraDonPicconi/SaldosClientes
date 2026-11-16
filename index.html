@@ -328,6 +328,19 @@
   .fab svg{ width:26px; height:26px; }
   .fab:active{ transform:scale(0.94); }
 
+  /* Atajo en la pestaña Clientes: cargar un nuevo movimiento de saldo */
+  .fab-saldo{
+    position:fixed; bottom:96px; right:22px;
+    width:56px; height:56px; border-radius:50%;
+    background:var(--verde); color:#fff; border:none;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 16px rgba(31,138,76,0.4);
+    cursor:pointer; z-index:50;
+  }
+  .fab-saldo.hidden{ display:none; }
+  .fab-saldo svg{ width:26px; height:26px; }
+  .fab-saldo:active{ transform:scale(0.94); }
+
   .fab-acciones{
     position:fixed; bottom:96px; right:22px;
     display:flex; flex-direction:column; gap:12px; z-index:50;
@@ -536,15 +549,21 @@
     color:var(--texto-tenue); font-size:14px; margin-top:6px; min-height:44px;
   }
   /* Selector de fecha propio */
-  .fecha-btn{
-    width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
-    padding:11px 12px; border-radius:10px; border:1px solid var(--azul-borde);
-    background:#fff; font-size:17px; color:#1a1f2b; cursor:pointer; text-align:left;
-    font-family:inherit;
+  .fecha-campo{ position:relative; width:100%; }
+  .nuevo-body .fecha-campo input.fecha-txt{
+    width:100%; padding:12px 30px; text-align:center; font-weight:700; letter-spacing:0;
+    border-radius:12px; border:1px solid var(--azul-borde); background:#fff;
+    font-size:16px; font-family:inherit; color:#1a1f2b; outline:none;
   }
-  .fecha-btn.vacio .fp-texto{ color:#9aa3b8; }
-  .fecha-btn svg{ width:19px; height:19px; color:var(--azul); flex-shrink:0; }
-  .resumen-fecha-campo .fecha-btn{ font-size:15px; padding:10px 12px; border-radius:11px; }
+  .nuevo-body .fecha-campo input.fecha-txt:focus{ border-color:var(--azul); }
+  .nuevo-body .fecha-campo input.fecha-txt::placeholder{ color:#9aa3b8; font-weight:600; }
+  .fecha-campo .fecha-icono{
+    position:absolute; right:2px; top:50%; transform:translateY(-50%);
+    width:32px; height:40px; padding:0; border:none; background:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; color:var(--azul);
+  }
+  .fecha-campo .fecha-icono svg{ width:19px; height:19px; }
+  .fecha-campo .fecha-icono:active{ opacity:0.6; }
   #fecha-modal{
     position:fixed; inset:0; z-index:180;
     background:rgba(17,22,36,0.55);
@@ -671,6 +690,10 @@
 
 <button id="fab-nuevo" class="fab hidden" aria-label="Nuevo movimiento">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<button id="fab-saldo" class="fab-saldo hidden" aria-label="Nuevo movimiento de saldo" title="Nuevo movimiento de saldo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.4-.9-1.4-1.4-2.8-1.4-1.6 0-2.7.8-2.7 2 0 3 5.6 1.4 5.6 4.2 0 1.2-1.2 2.1-2.9 2.1-1.5 0-2.6-.6-3-1.6"/><line x1="12" y1="6.5" x2="12" y2="7.8"/><line x1="12" y1="16.2" x2="12" y2="17.5"/></svg>
 </button>
 
 <div id="fecha-modal" class="hidden">
@@ -1802,6 +1825,7 @@ function posicionarFabs(){
   const right = wrap ? Math.max(16, window.innerWidth - wrap.getBoundingClientRect().right + 22) : 22;
   fabNuevo.style.right = right + 'px';
   fabAcciones.style.right = right + 'px';
+  fabSaldo.style.right = right + 'px';
 }
 window.addEventListener('resize', posicionarFabs);
 
@@ -2136,8 +2160,7 @@ function fpParse(str){
 }
 function fpSyncBoton(input){
   const d = fpParse(input.value);
-  input._fpBtn.querySelector('.fp-texto').textContent = d ? formatFecha(d) : 'Elegir fecha';
-  input._fpBtn.classList.toggle('vacio', !d);
+  input._fpTxt.value = d ? formatFecha(d) : '';
 }
 function fpElegir(fechaStr){
   if(!fpInput) return;
@@ -2220,21 +2243,88 @@ document.getElementById('fp-borrar').addEventListener('click', () => fpElegir(''
 document.getElementById('fp-cerrar').addEventListener('click', fpCerrar);
 fpModal.addEventListener('click', (e) => { if(e.target === fpModal) fpCerrar(); });
 
+// Convierte el texto escrito (ddmmaaaa, dd/mm/aa, ddmm...) en "YYYY-MM-DD".
+// Devuelve null si no es una fecha válida.
+function fpTextoAFecha(txt){
+  const dig = String(txt || '').replace(/\D/g, '');
+  let d, m, y;
+  const hoy = new Date();
+  if(dig.length === 8){ d = +dig.slice(0,2); m = +dig.slice(2,4); y = +dig.slice(4); }
+  else if(dig.length === 6){ d = +dig.slice(0,2); m = +dig.slice(2,4); y = 2000 + +dig.slice(4); }
+  else if(dig.length === 4){ d = +dig.slice(0,2); m = +dig.slice(2,4); y = hoy.getFullYear(); }
+  else return null;
+  const f = new Date(y, m - 1, d);
+  if(f.getFullYear() !== y || f.getMonth() !== m - 1 || f.getDate() !== d) return null;
+  return fechaLocalInput(f);
+}
+
 document.querySelectorAll('input[data-fecha]').forEach(input => {
+  const wrap = document.createElement('div');
+  wrap.className = 'fecha-campo';
+  const txt = document.createElement('input');
+  txt.type = 'text';
+  txt.className = 'fecha-txt';
+  txt.inputMode = 'numeric';
+  txt.placeholder = 'dd/mm/aaaa';
+  txt.maxLength = 10;
+  txt.autocomplete = 'off';
+  txt.setAttribute('aria-label', 'Fecha');
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'fecha-btn vacio';
-  btn.innerHTML = `<span class="fp-texto">Elegir fecha</span>${FP_ICONO}`;
-  input.insertAdjacentElement('afterend', btn);
-  input._fpBtn = btn;
+  btn.className = 'fecha-icono';
+  btn.setAttribute('aria-label', 'Abrir calendario');
+  btn.tabIndex = -1;
+  btn.innerHTML = FP_ICONO;
+  wrap.appendChild(txt);
+  wrap.appendChild(btn);
+  input.insertAdjacentElement('afterend', wrap);
+  input._fpTxt = txt;
   // Cada vez que el código le asigne .value al input (ej: al abrir el
-  // formulario), el texto del botón se actualiza solo.
+  // formulario), el texto del campo se actualiza solo.
   const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
   Object.defineProperty(input, 'value', {
     get(){ return desc.get.call(this); },
     set(v){ desc.set.call(this, v); fpSyncBoton(this); }
   });
-  btn.addEventListener('click', () => fpAbrir(input));
+
+  function aplicar(fechaStr){
+    if(input.value !== fechaStr){
+      input.value = fechaStr;
+      input.dispatchEvent(new Event('change'));
+    }
+    fpSyncBoton(input);
+  }
+  // Confirma lo escrito: si es válido lo guarda; si no, vuelve a la última fecha buena.
+  function confirmar(){
+    const t = txt.value.trim();
+    if(!t){
+      if(input.hasAttribute('data-fecha-opcional')) aplicar('');
+      else fpSyncBoton(input);
+      return;
+    }
+    const f = fpTextoAFecha(t);
+    if(f) aplicar(f); else fpSyncBoton(input);
+  }
+
+  // Mientras escribe: inserta las barras solas (dd/mm/aaaa).
+  txt.addEventListener('input', () => {
+    const dig = txt.value.replace(/\D/g, '').slice(0, 8);
+    let out = dig;
+    if(dig.length > 4) out = dig.slice(0,2) + '/' + dig.slice(2,4) + '/' + dig.slice(4);
+    else if(dig.length > 2) out = dig.slice(0,2) + '/' + dig.slice(2);
+    if(txt.value !== out) txt.value = out;
+    if(dig.length === 8){
+      const f = fpTextoAFecha(dig);
+      if(f) aplicar(f);
+    }
+  });
+  txt.addEventListener('focus', () => { setTimeout(() => { try{ txt.select(); }catch(e){} }, 0); });
+  txt.addEventListener('blur', confirmar);
+  txt.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); confirmar(); txt.blur(); }
+  });
+  // El calendario solo se abre al tocar el ícono.
+  btn.addEventListener('click', () => { confirmar(); fpAbrir(input); });
   fpSyncBoton(input);
 });
 /* =============================================== */
@@ -2243,6 +2333,7 @@ document.querySelectorAll('input[data-fecha]').forEach(input => {
 const fabNuevo = document.getElementById('fab-nuevo');
 const fabAcciones = document.getElementById('fab-acciones');
 const fabEditar = document.getElementById('fab-editar');
+const fabSaldo = document.getElementById('fab-saldo');
 const fabCopiar = document.getElementById('fab-copiar');
 const fabVer = document.getElementById('fab-ver');
 const fabEliminar = document.getElementById('fab-eliminar');
@@ -2286,6 +2377,15 @@ function aplicarPermisosUI(){
   fabEliminar.classList.toggle('hidden', miRol !== 'admin');
   fabNuevo.classList.toggle('hidden', esVisitante);
   if(esVisitante) fabAcciones.classList.add('hidden');
+  actualizarFabSaldo();
+}
+
+// Atajo "nuevo movimiento de saldo": solo en la pestaña Clientes, y se
+// esconde cuando hay un cliente seleccionado (ahí aparece la botonera de
+// acciones en el mismo lugar, y su botón copiar ya carga saldo a ese cliente).
+function actualizarFabSaldo(){
+  const ver = currentTab === 'clientes' && miRol !== 'visitante' && !clienteSeleccionadoNombre;
+  fabSaldo.classList.toggle('hidden', !ver);
 }
 
 function actualizarSeleccionUI(){
@@ -2707,6 +2807,12 @@ fabNuevo.addEventListener('click', () => {
 });
 document.getElementById('nuevo-cerrar').addEventListener('click', cerrarNuevoModal);
 document.getElementById('nuevo-cancelar-btn').addEventListener('click', cerrarNuevoModal);
+
+fabSaldo.addEventListener('click', () => {
+  if(miRol === 'visitante') return; // resguardo extra: el botón ya está oculto para visitante
+  abrirNuevoModal();
+  nmCliente.focus();
+});
 
 fabEditar.addEventListener('click', async () => {
   if(miRol !== 'admin') return; // el botón ya está oculto para colaborador; esto es un resguardo extra
