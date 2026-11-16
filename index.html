@@ -355,7 +355,8 @@
     cursor:pointer;
   }
   .fab-accion.copiar{ background:#5a6787; box-shadow:0 6px 16px rgba(90,103,135,0.4); }
-  .fab-accion.ver{ background:#3f8f8a; box-shadow:0 6px 16px rgba(63,143,138,0.4); }
+  .fab-accion.copiar.verde{ background:var(--verde); box-shadow:0 6px 16px rgba(31,138,76,0.4); }
+  .fab-accion.ver{ background:#a8896c; box-shadow:0 6px 16px rgba(168,137,108,0.4); }
 
   /* Modal: compartir saldos como texto */
   #compartir-texto-modal{
@@ -1590,6 +1591,9 @@ function renderMovimientos(filtro){
     .filter(mov => {
       if(repartoRapido && mov['Reparto'] !== repartoRapido) return false;
       if(!filtro) return true;
+      if(clienteExacto && filtro.trim().toLowerCase() === clienteExacto.toLowerCase()){
+        return String(mov['Cliente'] || '').trim().toLowerCase() === clienteExacto.toLowerCase();
+      }
       const texto = `${mov['Cliente']||''} ${mov['Reparto']||''}`.toLowerCase();
       return texto.includes(filtro.toLowerCase());
     })
@@ -2339,16 +2343,26 @@ const fabVer = document.getElementById('fab-ver');
 const fabEliminar = document.getElementById('fab-eliminar');
 let filaSeleccionadaId = null;
 let clienteSeleccionadoNombre = null;
+// Cliente exacto pedido desde el botón "Ver movimientos" (Clientes): mientras el
+// buscador siga con ese nombre, Movimientos muestra solo ese cliente (no "Johana" al buscar "Ana").
+let clienteExacto = null;
 
 // En la pestaña Movimientos, "copiar" duplica un movimiento. En la
 // pestaña Clientes, ese mismo botón se reutiliza para saltar a ver los
 // movimientos del cliente seleccionado (mismo ícono de FAB, otro uso).
 const ICONO_COPIAR_MOV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 
+// Mismo ícono de plata que el botón atajo de "nuevo movimiento de saldo".
+const ICONO_SALDO_MOV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.4-.9-1.4-1.4-2.8-1.4-1.6 0-2.7.8-2.7 2 0 3 5.6 1.4 5.6 4.2 0 1.2-1.2 2.1-2.9 2.1-1.5 0-2.6-.6-3-1.6"/><line x1="12" y1="6.5" x2="12" y2="7.8"/><line x1="12" y1="16.2" x2="12" y2="17.5"/></svg>';
+
 function actualizarIconosFabAcciones(){
   // "Ver movimientos" solo existe en la pestaña Clientes.
   fabVer.classList.toggle('hidden', currentTab !== 'clientes');
-  fabCopiar.innerHTML = ICONO_COPIAR_MOV;
+  fabCopiar.innerHTML = currentTab === 'clientes' ? ICONO_SALDO_MOV : ICONO_COPIAR_MOV;
+  // En Clientes es el atajo de "nuevo movimiento": mismo verde que el botón de esa pestaña.
+  fabCopiar.classList.toggle('verde', currentTab === 'clientes');
+  // En Clientes el botón de cargar saldo va primero (arriba de todo), antes de "Ver movimientos".
+  fabCopiar.style.order = currentTab === 'clientes' ? '-1' : '';
   if(currentTab === 'clientes'){
     fabCopiar.setAttribute('aria-label', 'Duplicar: cargar saldo a este cliente');
     fabEditar.setAttribute('aria-label', 'Editar cliente');
@@ -2876,6 +2890,7 @@ fabVer.addEventListener('click', () => {
     setTab('movimientos');
     repartoRapido = '';
     marcarChipsReparto();
+    clienteExacto = String(nombre).trim();
     searchEl.value = nombre;
     render();
   }
