@@ -2501,7 +2501,9 @@ function actualizarSaldosPreview(){
   const editId = nmEditId.value;
 
   const importe = parseFloat(limpiarCantidadParaEnvio(nmImporte.value.trim() || '0')) || 0;
-  const entrego = parseFloat(limpiarCantidadParaEnvio(nmEntrego.value.trim() || '0')) || 0;
+  const entrego = nmEntrego.value.includes('+')
+    ? sumaEntrego_(nmEntrego.value)
+    : (parseFloat(limpiarCantidadParaEnvio(nmEntrego.value.trim() || '0')) || 0);
   const saldo = importe - entrego;
 
   const cli = clientes.find(c => String(c['Cliente']||'').trim().toLowerCase() === nombre);
@@ -2634,7 +2636,11 @@ nmFecha.addEventListener('change', actualizarSaldosPreview);
 [nmImporte, nmEntrego].forEach(inp => inp.addEventListener('input', actualizarSaldosPreview));
 
 // Formateo en vivo de Importe/Entregó: separador de miles, $ adelante.
-function formatearCantidad(valorCrudo){
+function formatearCantidad(valorCrudo, permitirSuma){
+  // En Entregó se pueden escribir sumas (ej: 5000+3000+2000): cada término se formatea por separado.
+  if(permitirSuma && valorCrudo.includes('+')){
+    return valorCrudo.split('+').map(t => formatearCantidad(t, false)).join('+');
+  }
   const negativo = valorCrudo.trim().startsWith('-');
   let limpio = valorCrudo.replace(/[^0-9,]/g, '');
   const idxComa = limpio.indexOf(',');
@@ -2654,13 +2660,30 @@ function limpiarCantidadParaEnvio(valorFormateado){
   return valorFormateado.replace(/\$/g, '').replace(/\./g, '');
 }
 
+// Suma de los términos escritos en Entregó (ej: "$5.000+$3.000" -> 8000).
+function sumaEntrego_(texto){
+  const total = String(texto).split('+').reduce((acc, t) => {
+    const n = parseFloat(limpiarCantidadParaEnvio(t.trim() || '0').replace(',', '.'));
+    return acc + (isNaN(n) ? 0 : n);
+  }, 0);
+  return Math.round(total * 100) / 100;
+}
+// Si Entregó tiene una suma, la reemplaza por el total ya resuelto.
+function resolverEntrego_(){
+  if(!nmEntrego.value.includes('+')) return;
+  const total = sumaEntrego_(nmEntrego.value);
+  nmEntrego.value = total ? formatearCantidad(String(total).replace('.', ',')) : '';
+  nmEntrego._prevVal = nmEntrego.value;
+  actualizarSaldosPreview();
+}
+
 // Formatea el valor de un input EN VIVO sin mandar el cursor al final.
 // Cuenta cuántos caracteres "significativos" (dígitos y coma) hay antes del
 // cursor, formatea, y vuelve a poner el cursor después de esa misma cantidad
 // de caracteres significativos en el texto nuevo. Los puntos de miles y el $
 // no cuentan, así que el cursor no se corre cuando aparecen o desaparecen.
 function formatearConCursor(inp, e){
-  const SIG = /[0-9,]/g;
+  const SIG = /[0-9,+]/g;
   const sig = (s) => (s.match(SIG) || []).length;
   let crudo = inp.value;
   let pos = inp.selectionStart;
@@ -2675,17 +2698,17 @@ function formatearConCursor(inp, e){
       && crudo.length < prev.length && sig(crudo) === sig(prev)){
     if(tipo === 'deleteContentBackward'){
       let i = pos - 1;
-      while(i >= 0 && !/[0-9,]/.test(crudo[i])) i--;
+      while(i >= 0 && !/[0-9,+]/.test(crudo[i])) i--;
       if(i >= 0){ crudo = crudo.slice(0, i) + crudo.slice(i + 1); pos = i; }
     }else{
       let i = pos;
-      while(i < crudo.length && !/[0-9,]/.test(crudo[i])) i++;
+      while(i < crudo.length && !/[0-9,+]/.test(crudo[i])) i++;
       if(i < crudo.length){ crudo = crudo.slice(0, i) + crudo.slice(i + 1); pos = i; }
     }
   }
 
   const sigAntes = sig(crudo.slice(0, pos));
-  const nuevo = formatearCantidad(crudo);
+  const nuevo = formatearCantidad(crudo, inp.id === 'nm-entrego');
   inp.value = nuevo;
   inp._prevVal = nuevo;
 
@@ -2693,12 +2716,12 @@ function formatearConCursor(inp, e){
   // significativos a la izquierda del cursor
   let nuevaPos = nuevo.length;
   if(sigAntes === 0){
-    const m = nuevo.search(/[0-9,]/);
+    const m = nuevo.search(/[0-9,+]/);
     nuevaPos = m === -1 ? nuevo.length : m;
   }else{
     let vistos = 0;
     for(let i = 0; i < nuevo.length; i++){
-      if(/[0-9,]/.test(nuevo[i])){
+      if(/[0-9,+]/.test(nuevo[i])){
         vistos++;
         if(vistos === sigAntes){ nuevaPos = i + 1; break; }
       }
@@ -2717,6 +2740,7 @@ document.addEventListener('beforeinput', (e) => {
 [nmImporte, nmEntrego].forEach(inp => {
   inp.addEventListener('input', (e) => formatearConCursor(inp, e));
 });
+nmEntrego.addEventListener('blur', resolverEntrego_);
 
 function numeroAInputStr(num){
   if(num === undefined || num === null || num === '') return '';
@@ -3142,6 +3166,7 @@ nrGuardar.addEventListener('click', async () => {
 
 btnGuardar.addEventListener('click', async () => {
   nuevoError.textContent = '';
+  resolverEntrego_();
 
   const cliente = nmCliente.value.trim();
   const reparto = nmReparto.value.trim();
@@ -3214,6 +3239,7 @@ if('serviceWorker' in navigator){
         btnGuardar.focus();
         return;
       }
+      if(id === 'nm-entrego') resolverEntrego_();
       const sig = siguiente[id] && document.getElementById(siguiente[id]);
       if(sig) sig.focus(); else el.blur();
     });
