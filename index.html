@@ -511,6 +511,7 @@
   .btn-cancelar:active{ background:var(--azul-borde); }
   .btn-guardar{ background:var(--azul); color:#fff; }
   .btn-guardar:active{ opacity:0.9; }
+  #nuevo-guardar:focus-visible{ outline:3px solid rgba(0,0,0,0.35); outline-offset:2px; }
   .btn-guardar:disabled{ opacity:0.6; }
 
   /* Pantalla de login */
@@ -2325,7 +2326,13 @@ document.querySelectorAll('input[data-fecha]').forEach(input => {
   txt.addEventListener('focus', () => { setTimeout(() => { try{ txt.select(); }catch(e){} }, 0); });
   txt.addEventListener('blur', confirmar);
   txt.addEventListener('keydown', (e) => {
-    if(e.key === 'Enter'){ e.preventDefault(); confirmar(); txt.blur(); }
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      confirmar();
+      // En el formulario de carga, Enter guarda la fecha y pasa al campo Cliente.
+      if(input.id === 'nm-fecha'){ const c = document.getElementById('nm-cliente'); if(c){ c.focus(); return; } }
+      txt.blur();
+    }
   });
   // El calendario solo se abre al tocar el ícono.
   btn.addEventListener('click', () => { confirmar(); fpAbrir(input); });
@@ -3189,19 +3196,36 @@ if('serviceWorker' in navigator){
 }
 /* ================================================================ */
 
-/* ============== Tecla OK del teclado ============== */
-// Enter / OK: Importe pasa a Entregó; el resto cierra el teclado.
+/* ============== Teclado: Enter / OK y Escape ============== */
+// Formulario de carga: Importe -> Entregó -> Notas -> botón Guardar (Enter otra vez guarda).
+// Escape cancela (cierra primero el calendario si está abierto).
 (function(){
-  const siguiente = { 'nm-importe': 'nm-entrego' };
+  const siguiente = { 'nm-importe': 'nm-entrego', 'nm-entrego': 'nm-notas' };
   ['nm-importe','nm-entrego','nm-notas','nc-nombre','search'].forEach(id => {
     const el = document.getElementById(id);
     if(!el) return;
     el.addEventListener('keydown', e => {
       if(e.key !== 'Enter') return;
       e.preventDefault();
+      if(id === 'nm-notas'){
+        // Primer Enter en Notas: sale del campo y deja el foco en Guardar.
+        // El siguiente Enter aprieta el botón y guarda el formulario.
+        if(e.repeat) return;
+        btnGuardar.focus();
+        return;
+      }
       const sig = siguiente[id] && document.getElementById(siguiente[id]);
       if(sig) sig.focus(); else el.blur();
     });
+  });
+
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape' || e.defaultPrevented) return;
+    if(!fpModal.classList.contains('hidden')){ fpCerrar(); return; }
+    const ncm = document.getElementById('nuevo-cliente-modal');
+    if(!nuevoModal.classList.contains('hidden') && (!ncm || ncm.classList.contains('hidden'))){
+      cerrarNuevoModal();
+    }
   });
 })();
 </script>
