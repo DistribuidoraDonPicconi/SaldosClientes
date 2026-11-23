@@ -2069,7 +2069,6 @@ function armarTextoSaldos_(lista){
       fechaComparable_(a.fecha) - fechaComparable_(b.fecha) || a.nombre.localeCompare(b.nombre, 'es'));
     const subtotal = redondear(items.reduce((acc, c) => acc + c.saldo, 0));
 
-    lineas.push('');
     lineas.push(`━━━━━━━━━━━━━━`);
     lineas.push(`*${cat.toUpperCase()}* (${items.length})`);
     lineas.push(`*${formatMoneda(subtotal)}*`);
