@@ -366,6 +366,9 @@
     padding:24px;
   }
   #compartir-texto-modal.hidden{ display:none; }
+  .texto-partes{ display:flex; gap:8px; margin-bottom:10px; }
+  .compartir-box .texto-partes button{ flex:1; padding:10px; font-size:14px; background:var(--azul-suave); color:var(--azul-osc); }
+  .compartir-box .texto-partes button.activa{ background:var(--azul); color:#fff; }
   .texto-preview{
     width:100%; max-height:320px; overflow:auto; text-align:left;
     border:1px solid var(--linea); border-radius:12px; margin:0 0 16px; padding:12px;
@@ -663,6 +666,10 @@
 <div id="compartir-texto-modal" class="hidden">
   <div class="compartir-box">
     <h3>Saldos en texto</h3>
+    <div class="texto-partes">
+      <button type="button" id="btn-parte-0">1. Resumen</button>
+      <button type="button" id="btn-parte-1">2. Detalle</button>
+    </div>
     <pre class="texto-preview" id="texto-preview"></pre>
     <div class="compartir-actions">
       <button class="btn-whatsapp" id="btn-texto-whatsapp">
@@ -2088,15 +2095,28 @@ function armarTextoSaldos_(lista){
 const compartirTextoModal = document.getElementById('compartir-texto-modal');
 const textoPreview = document.getElementById('texto-preview');
 let textoSaldosActual = '';
+let textoSaldosPartes = [];
+
+// Muestra una de las dos partes; Enviar y Copiar usan la que está a la vista.
+function elegirParteSaldos_(i){
+  textoSaldosActual = textoSaldosPartes[i];
+  // En la vista previa se ocultan los marcadores de WhatsApp (* y ```).
+  textoPreview.textContent = textoSaldosActual.replace(/\*/g, '').replace(/_([0-9\/\-]+)_/g, '$1');
+  textoPreview.scrollTop = 0;
+  [0, 1].forEach(n => document.getElementById('btn-parte-' + n).classList.toggle('activa', n === i));
+}
+[0, 1].forEach(n => document.getElementById('btn-parte-' + n).addEventListener('click', () => elegirParteSaldos_(n)));
 
 function abrirCompartirTexto(){
   if(!ultimaListaClientesVisible.length){
     alert('No hay clientes para compartir.');
     return;
   }
-  textoSaldosActual = armarTextoSaldos_(ultimaListaClientesVisible);
-  // En la vista previa se ocultan los marcadores de WhatsApp (* y ```).
-  textoPreview.textContent = textoSaldosActual.replace(/\*/g, '').replace(/_([0-9\/\-]+)_/g, '$1');
+  // Dos mensajes: el resumen y, desde "DETALLE POR REPARTO", el detalle.
+  const completo = armarTextoSaldos_(ultimaListaClientesVisible);
+  const corte = completo.indexOf('*DETALLE POR REPARTO*');
+  textoSaldosPartes = [completo.slice(0, corte).trim(), completo.slice(corte)];
+  elegirParteSaldos_(0);
   compartirTextoModal.classList.remove('hidden');
 }
 
@@ -2511,7 +2531,7 @@ function actualizarSaldosPreview(){
   const editId = nmEditId.value;
 
   const importe = parseFloat(limpiarCantidadParaEnvio(nmImporte.value.trim() || '0')) || 0;
-  const entrego = parseFloat(limpiarCantidadParaEnvio(nmEntrego.value.trim() || '0')) || 0;
+  const entrego = totalSuma(nmEntrego.value);
   const saldo = importe - entrego;
 
   const cli = clientes.find(c => String(c['Cliente']||'').trim().toLowerCase() === nombre);
@@ -2661,7 +2681,29 @@ function formatearCantidad(valorCrudo){
 }
 
 function limpiarCantidadParaEnvio(valorFormateado){
-  return valorFormateado.replace(/\$/g, '').replace(/\./g, '');
+  return valorFormateado.replace(/\$/g, '').replace(/\./g, '').replace(/,/g, '.');
+}
+
+// "Entregó" admite sumas (ej: 73000+2000). Formatea cada término por separado.
+function formatearSuma(valorCrudo){
+  const partes = valorCrudo.split('+').map(formatearCantidad);
+  if(partes.length > 1 && partes[0] === '') partes.shift();
+  return partes.join('+');
+}
+
+// Total numérico de una suma (o de un monto solo).
+function totalSuma(valor){
+  const total = valor.split('+').reduce((acc, t) =>
+    acc + (parseFloat(limpiarCantidadParaEnvio(t.trim())) || 0), 0);
+  return Math.round(total * 100) / 100;
+}
+
+// Reemplaza la suma escrita en el campo por su resultado.
+function resolverSuma(inp){
+  if(inp.value.indexOf('+') === -1) return;
+  inp.value = formatearCantidad(String(totalSuma(inp.value)).replace('.', ','));
+  inp._prevVal = inp.value;
+  actualizarSaldosPreview();
 }
 
 // Formatea el valor de un input EN VIVO sin mandar el cursor al final.
@@ -2670,7 +2712,9 @@ function limpiarCantidadParaEnvio(valorFormateado){
 // de caracteres significativos en el texto nuevo. Los puntos de miles y el $
 // no cuentan, así que el cursor no se corre cuando aparecen o desaparecen.
 function formatearConCursor(inp, e){
-  const SIG = /[0-9,]/g;
+  const esSuma = inp.id === 'nm-entrego';
+  const car = esSuma ? /[0-9,+]/ : /[0-9,]/;
+  const SIG = new RegExp(car.source, 'g');
   const sig = (s) => (s.match(SIG) || []).length;
   let crudo = inp.value;
   let pos = inp.selectionStart;
@@ -2685,17 +2729,17 @@ function formatearConCursor(inp, e){
       && crudo.length < prev.length && sig(crudo) === sig(prev)){
     if(tipo === 'deleteContentBackward'){
       let i = pos - 1;
-      while(i >= 0 && !/[0-9,]/.test(crudo[i])) i--;
+      while(i >= 0 && !car.test(crudo[i])) i--;
       if(i >= 0){ crudo = crudo.slice(0, i) + crudo.slice(i + 1); pos = i; }
     }else{
       let i = pos;
-      while(i < crudo.length && !/[0-9,]/.test(crudo[i])) i++;
+      while(i < crudo.length && !car.test(crudo[i])) i++;
       if(i < crudo.length){ crudo = crudo.slice(0, i) + crudo.slice(i + 1); pos = i; }
     }
   }
 
   const sigAntes = sig(crudo.slice(0, pos));
-  const nuevo = formatearCantidad(crudo);
+  const nuevo = esSuma ? formatearSuma(crudo) : formatearCantidad(crudo);
   inp.value = nuevo;
   inp._prevVal = nuevo;
 
@@ -2703,12 +2747,12 @@ function formatearConCursor(inp, e){
   // significativos a la izquierda del cursor
   let nuevaPos = nuevo.length;
   if(sigAntes === 0){
-    const m = nuevo.search(/[0-9,]/);
+    const m = nuevo.search(car);
     nuevaPos = m === -1 ? nuevo.length : m;
   }else{
     let vistos = 0;
     for(let i = 0; i < nuevo.length; i++){
-      if(/[0-9,]/.test(nuevo[i])){
+      if(car.test(nuevo[i])){
         vistos++;
         if(vistos === sigAntes){ nuevaPos = i + 1; break; }
       }
@@ -2727,6 +2771,8 @@ document.addEventListener('beforeinput', (e) => {
 [nmImporte, nmEntrego].forEach(inp => {
   inp.addEventListener('input', (e) => formatearConCursor(inp, e));
 });
+// Al salir de "Entregó" (Tab, clic afuera o Enter) se resuelve la suma.
+nmEntrego.addEventListener('blur', () => resolverSuma(nmEntrego));
 
 function numeroAInputStr(num){
   if(num === undefined || num === null || num === '') return '';
@@ -3174,7 +3220,7 @@ btnGuardar.addEventListener('click', async () => {
     cliente, reparto,
     fecha: nmFecha.value,
     importe: limpiarCantidadParaEnvio(nmImporte.value.trim() || '0'),
-    entrego: limpiarCantidadParaEnvio(nmEntrego.value.trim() || '0'),
+    entrego: String(totalSuma(nmEntrego.value)),
     notas: nmNotas.value.trim()
   };
   if(nmEditId.value) payload.id = nmEditId.value;
