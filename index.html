@@ -2057,16 +2057,27 @@ function armarTextoSaldos_(lista){
   lineas.push('Distribuidora Don Picconi');
   lineas.push(new Date().toLocaleDateString('es-AR'));
   lineas.push('');
-  lineas.push('*TOTAL GENERAL*');
-  lineas.push(`*${formatMoneda(total)}*`);
+  // Resumen: Granja por un lado, los Repartos por otro, y el total general al final.
+  const resumenGrupo = (titulo, cats) => {
+    const activas = cats.filter(cat => grupos[cat] && grupos[cat].length);
+    if(!activas.length) return 0;
+    lineas.push('');
+    lineas.push(`*${titulo}*`);
+    let subGrupo = 0;
+    activas.forEach(cat => {
+      const sub = redondear(grupos[cat].reduce((acc, c) => acc + c.saldo, 0));
+      subGrupo += sub;
+      lineas.push(`• ${cat} (${grupos[cat].length}): *${formatMoneda(sub)}*`);
+    });
+    lineas.push(`*Total ${formatMoneda(redondear(subGrupo))}*`);
+    return subGrupo;
+  };
+  resumenGrupo('Granja', categorias.filter(cat => cat === 'Granja'));
+  resumenGrupo('Repartos', categorias.filter(cat => cat !== 'Granja'));
 
-  // Resumen: total de cada reparto, antes del detalle.
   lineas.push('');
-  lineas.push('*TOTAL POR REPARTO*');
-  categorias.forEach(cat => {
-    const sub = redondear(grupos[cat].reduce((acc, c) => acc + c.saldo, 0));
-    lineas.push(`• ${cat} (${grupos[cat].length}): *${formatMoneda(sub)}*`);
-  });
+  lineas.push('*Total General*');
+  lineas.push(`*${formatMoneda(total)}*`);
 
   // Detalle de cada reparto.
   lineas.push('');
