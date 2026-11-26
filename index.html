@@ -2056,7 +2056,6 @@ function armarTextoSaldos_(lista){
   lineas.push('*SALDOS DE CLIENTES*');
   lineas.push('Distribuidora Don Picconi');
   lineas.push(new Date().toLocaleDateString('es-AR'));
-  lineas.push('');
   // Resumen: Granja por un lado, los Repartos por otro, y el total general al final.
   const resumenGrupo = (titulo, cats) => {
     const activas = cats.filter(cat => grupos[cat] && grupos[cat].length);
@@ -3090,10 +3089,18 @@ function cerrarNuevoClienteModal(){
 document.getElementById('nc-cerrar').addEventListener('click', cerrarNuevoClienteModal);
 document.getElementById('nc-cancelar-btn').addEventListener('click', cerrarNuevoClienteModal);
 
+// Primera letra del nombre siempre en mayúscula (al salir de la casilla y al guardar).
+function capitalizarNombre_(txt){
+  const t = String(txt || '').trim();
+  return t ? t.charAt(0).toLocaleUpperCase('es') + t.slice(1) : t;
+}
+ncNombre.addEventListener('blur', () => { ncNombre.value = capitalizarNombre_(ncNombre.value); });
+
 ncGuardar.addEventListener('click', async () => {
   ncError.textContent = '';
 
-  const nombre = ncNombre.value.trim();
+  const nombre = capitalizarNombre_(ncNombre.value);
+  ncNombre.value = nombre;
   if(!nombre){
     ncError.textContent = 'Completá el nombre del cliente.';
     return;
