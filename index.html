@@ -366,8 +366,9 @@
     padding:24px;
   }
   #compartir-texto-modal.hidden{ display:none; }
-  .texto-partes{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
-  .compartir-box .texto-partes button{ flex:1 1 auto; padding:10px 12px; font-size:14px; background:var(--azul-suave); color:var(--azul-osc); }
+  .texto-partes{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+  .texto-partes button:last-child:nth-child(odd){ grid-column:1 / -1; }
+  .compartir-box .texto-partes button{ width:100%; min-width:0; padding:10px 12px; font-size:14px; background:var(--azul-suave); color:var(--azul-osc); }
   .compartir-box .texto-partes button.activa{ background:var(--azul); color:#fff; }
   .texto-preview{
     width:100%; max-height:320px; overflow:auto; text-align:left;
