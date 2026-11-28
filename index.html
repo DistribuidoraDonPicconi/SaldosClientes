@@ -366,8 +366,8 @@
     padding:24px;
   }
   #compartir-texto-modal.hidden{ display:none; }
-  .texto-partes{ display:flex; gap:8px; margin-bottom:10px; }
-  .compartir-box .texto-partes button{ flex:1; padding:10px; font-size:14px; background:var(--azul-suave); color:var(--azul-osc); }
+  .texto-partes{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .compartir-box .texto-partes button{ flex:1 1 auto; padding:10px 12px; font-size:14px; background:var(--azul-suave); color:var(--azul-osc); }
   .compartir-box .texto-partes button.activa{ background:var(--azul); color:#fff; }
   .texto-preview{
     width:100%; max-height:320px; overflow:auto; text-align:left;
@@ -666,10 +666,7 @@
 <div id="compartir-texto-modal" class="hidden">
   <div class="compartir-box">
     <h3>Saldos en texto</h3>
-    <div class="texto-partes">
-      <button type="button" id="btn-parte-0">1. Resumen</button>
-      <button type="button" id="btn-parte-1">2. Detalle</button>
-    </div>
+    <div class="texto-partes" id="texto-partes"></div>
     <pre class="texto-preview" id="texto-preview"></pre>
     <div class="compartir-actions">
       <button class="btn-whatsapp" id="btn-texto-whatsapp">
@@ -2078,54 +2075,62 @@ function armarTextoSaldos_(lista){
   lineas.push('*Total General*');
   lineas.push(`*${formatMoneda(total)}*`);
 
-  // Detalle de cada reparto.
-  lineas.push('');
-  lineas.push('*DETALLE POR REPARTO*');
+  const partes = [{ etiqueta: 'Resumen', texto: lineas.join('\n') }];
+
+  // Un mensaje por cada reparto, solo con el título del reparto y su detalle.
   categorias.forEach(cat => {
     const items = grupos[cat].slice().sort((a, b) =>
       fechaComparable_(a.fecha) - fechaComparable_(b.fecha) || a.nombre.localeCompare(b.nombre, 'es'));
     const subtotal = redondear(items.reduce((acc, c) => acc + c.saldo, 0));
 
-    lineas.push(`━━━━━━━━━━━━━━`);
-    lineas.push(`*${cat.toUpperCase()}* (${items.length})`);
-    lineas.push(`*${formatMoneda(subtotal)}*`);
-    lineas.push(`━━━━━━━━━━━━━━`);
+    const l = [];
+    l.push(`━━━━━━━━━━━━━━`);
+    l.push(`*${cat.toUpperCase()}* (${items.length})`);
+    l.push(`*${formatMoneda(subtotal)}*`);
+    l.push(`━━━━━━━━━━━━━━`);
     items.forEach(c => {
       // Cliente arriba; debajo, fecha del último movimiento | saldo.
       const f = formatFecha(c.fecha);
       const fechaCorta = f.length === 10 ? f.slice(0, 6) + f.slice(8) : f;
-      lineas.push(`• ${c.nombre}:`);
-      lineas.push(`  _${fechaCorta}_ | *${formatMoneda(c.saldo)}*`);
+      l.push(`• ${c.nombre}:`);
+      l.push(`  _${fechaCorta}_ | *${formatMoneda(c.saldo)}*`);
     });
+    partes.push({ etiqueta: cat, texto: l.join('\n') });
   });
 
-  return lineas.join('\n');
+  return partes;
 }
 
 const compartirTextoModal = document.getElementById('compartir-texto-modal');
 const textoPreview = document.getElementById('texto-preview');
+const textoPartesBox = document.getElementById('texto-partes');
 let textoSaldosActual = '';
 let textoSaldosPartes = [];
 
-// Muestra una de las dos partes; Enviar y Copiar usan la que está a la vista.
+// Muestra uno de los mensajes; Enviar y Copiar usan el que está a la vista.
 function elegirParteSaldos_(i){
-  textoSaldosActual = textoSaldosPartes[i];
+  textoSaldosActual = textoSaldosPartes[i].texto;
   // En la vista previa se ocultan los marcadores de WhatsApp (* y ```).
   textoPreview.textContent = textoSaldosActual.replace(/\*/g, '').replace(/_([0-9\/\-]+)_/g, '$1');
   textoPreview.scrollTop = 0;
-  [0, 1].forEach(n => document.getElementById('btn-parte-' + n).classList.toggle('activa', n === i));
+  [...textoPartesBox.children].forEach((b, n) => b.classList.toggle('activa', n === i));
 }
-[0, 1].forEach(n => document.getElementById('btn-parte-' + n).addEventListener('click', () => elegirParteSaldos_(n)));
 
 function abrirCompartirTexto(){
   if(!ultimaListaClientesVisible.length){
     alert('No hay clientes para compartir.');
     return;
   }
-  // Dos mensajes: el resumen y, desde "DETALLE POR REPARTO", el detalle.
-  const completo = armarTextoSaldos_(ultimaListaClientesVisible);
-  const corte = completo.indexOf('*DETALLE POR REPARTO*');
-  textoSaldosPartes = [completo.slice(0, corte).trim(), completo.slice(corte)];
+  // Un mensaje para el resumen y uno por cada reparto.
+  textoSaldosPartes = armarTextoSaldos_(ultimaListaClientesVisible);
+  textoPartesBox.innerHTML = '';
+  textoSaldosPartes.forEach((p, n) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = (n + 1) + '. ' + p.etiqueta;
+    b.addEventListener('click', () => elegirParteSaldos_(n));
+    textoPartesBox.appendChild(b);
+  });
   elegirParteSaldos_(0);
   compartirTextoModal.classList.remove('hidden');
 }
